@@ -16,13 +16,12 @@ export default function TopicSidebar() {
   const topics = usePlanStore((s) => s.topics);
   const selectedTopicId = usePlanStore((s) => s.selectedTopicId);
   const go = usePlanStore((s) => s.go);
-  const view = usePlanStore((s) => s.view.name);
   const setPanel = usePlanStore((s) => s.setPanel);
   const isEditMode = usePlanStore((s) => s.isEditMode);
   const addTopic = usePlanStore((s) => s.addTopic);
   const [name, setName] = useState('');
   const list = sortedTopics(topics);
-  const allOn = selectedTopicId === null && view === 'detail';
+  const allOn = selectedTopicId === null;
 
   const cls = (on: boolean) =>
     `flex min-w-max flex-1 items-center justify-center gap-2 px-3 text-sm transition-shadow ${
@@ -33,10 +32,10 @@ export default function TopicSidebar() {
     <nav aria-label="נושאי התוכנית" className="no-print flex h-12 shrink-0 items-stretch gap-1 overflow-x-auto bg-ink/[0.05] px-2 py-1 md:px-6">
       <button
         aria-pressed={allOn}
-        title="כל שכבות הפיתוח יחד, במבט קרוב על הרחוב"
+        title="כל שכבות התוכנית יחד"
         onClick={() => {
           setPanel(null);
-          go({ topic: null, view: 'detail' });
+          go({ topic: null });
         }}
         className={cls(allOn)}
       >
@@ -49,7 +48,7 @@ export default function TopicSidebar() {
             key={t.id}
             onClick={() => {
               setPanel(null);
-              go(on ? { topic: null, view: 'perspective' } : { topic: t.id, view: t.id === 'massing' || t.id === 'public' ? 'perspective' : 'detail' });
+              go({ topic: on ? null : t.id });
             }}
             aria-pressed={on}
             title={`${t.nameHe}: ${STATUS_LABEL[t.status]}`}

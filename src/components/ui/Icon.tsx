@@ -43,6 +43,13 @@ const P: Record<string, ReactNode> = {
       <path d="M21 21l-5-5M8 11h6M11 8v6" />
     </>
   ),
+  box: (
+    <>
+      <path d="M3 3h13v10H3z" strokeDasharray="3 2" />
+      <circle cx="16" cy="16" r="3.5" />
+      <path d="m21 21-2.5-2.5" />
+    </>
+  ),
   zoomOut: (
     <>
       <circle cx="11" cy="11" r="7" />

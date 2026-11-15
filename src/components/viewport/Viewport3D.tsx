@@ -67,6 +67,21 @@ function CameraRig() {
     moving.current = true;
   }, [zoom, camera, controls, pos, tgt]);
 
+  // זום למלבן: נקודת המבט עוברת למרכז המלבן על הקרקע, והמצלמה מתקרבת באותו כיוון לפי גודל המלבן
+  const box = usePlanStore((s) => s.box);
+  useEffect(() => {
+    if (box.tick === 0 || !controls) return;
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(box.nx, box.ny), camera);
+    const hit = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+    if (!hit) return;
+    const offset = camera.position.clone().sub(controls.target);
+    const dist = Math.max(18, camera.position.distanceTo(hit) * box.scale);
+    tgt.copy(hit);
+    pos.copy(hit).addScaledVector(offset.normalize(), dist);
+    moving.current = true;
+  }, [box, camera, controls, pos, tgt]);
+
   useEffect(() => {
     if (!controls) return;
     const stop = () => (moving.current = false);
@@ -166,6 +181,16 @@ export default function Viewport3D() {
   const setMassMode = usePlanStore((s) => s.setMassMode);
   const viewName = usePlanStore((s) => s.view.name);
   const setView = usePlanStore((s) => s.setView);
+  const zoomToBox = usePlanStore((s) => s.zoomToBox);
+  // כלי הזום למלבן: גוררים מלבן על המודל
+  const [boxMode, setBoxMode] = useState(false);
+  const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  useEffect(() => {
+    if (!boxMode) return;
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && (setBoxMode(false), setDrag(null));
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [boxMode]);
   const [start] = useState(() => viewOf(usePlanStore.getState().view.name));
   const development = topic !== null && topic.id !== 'massing' && topic.id !== 'public';
 
@@ -223,9 +248,51 @@ export default function Viewport3D() {
         <IconBtn icon="satellite" label="רקע: תצלום לוויין" on={real || mode === 'satellite'} disabled={real} onClick={() => setMode('satellite')} />
         <IconBtn icon="none" label="בלי רקע" on={!real && mode === 'none'} disabled={real} onClick={() => setMode('none')} />
         <span className="my-0.5 h-px bg-ink/15" />
+        <IconBtn icon="box" label="זום למלבן: סמני מלבן על קטע רחוב" on={boxMode} onClick={() => setBoxMode((b) => !b)} />
         <IconBtn icon="zoomIn" label="התקרבות" onClick={() => zoomBy(1)} />
         <IconBtn icon="zoomOut" label="התרחקות" onClick={() => zoomBy(-1)} />
       </div>
+
+      {/* שכבת הסימון של כלי הזום למלבן */}
+      {boxMode && (
+        <div
+          className="no-print absolute inset-0 z-10 cursor-crosshair touch-none"
+          onPointerDown={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setDrag({ x0: e.clientX - r.left, y0: e.clientY - r.top, x1: e.clientX - r.left, y1: e.clientY - r.top });
+          }}
+          onPointerMove={(e) => {
+            if (!drag) return;
+            const r = e.currentTarget.getBoundingClientRect();
+            setDrag({ ...drag, x1: e.clientX - r.left, y1: e.clientY - r.top });
+          }}
+          onPointerUp={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            if (drag) {
+              const w = Math.abs(drag.x1 - drag.x0);
+              const h = Math.abs(drag.y1 - drag.y0);
+              if (w > 12 && h > 12) {
+                const cx = (drag.x0 + drag.x1) / 2;
+                const cy = (drag.y0 + drag.y1) / 2;
+                zoomToBox((cx / r.width) * 2 - 1, -((cy / r.height) * 2 - 1), Math.max(w / r.width, h / r.height));
+                setBoxMode(false);
+              }
+            }
+            setDrag(null);
+          }}
+        >
+          {drag && (
+            <div
+              className="absolute bg-ink/10 outline-dashed outline-2 outline-ink"
+              style={{ left: Math.min(drag.x0, drag.x1), top: Math.min(drag.y0, drag.y1), width: Math.abs(drag.x1 - drag.x0), height: Math.abs(drag.y1 - drag.y0) }}
+            />
+          )}
+          <p className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 bg-ink px-3 py-1 text-sm text-white">
+            גררי מלבן סביב קטע הרחוב שרוצים להגדיל. Esc מבטל.
+          </p>
+        </div>
+      )}
 
       {/* הדמיות צוות התכנון: התמונות הריאליסטיות באמת, לצד הדמיית הזמן-אמת */}
       {real && (

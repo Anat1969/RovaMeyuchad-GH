@@ -35,6 +35,8 @@ interface PlanState {
   selectedLot: string | null;
   view: { name: CameraView | 'detail'; tick: number };
   zoom: { dir: 1 | -1; tick: number };
+  /** זום למלבן שסומן על המודל: מרכז המלבן (בקואורדינטות מסך מנורמלות) והיחס שלו לחלון */
+  box: { nx: number; ny: number; scale: number; tick: number };
   contextMode: ContextMode;
   renderMode: RenderMode;
   massMode: MassMode; // מודל הזכויות, או מודל התכנון של האדריכל
@@ -55,12 +57,13 @@ interface PlanState {
   selectLot: (num: string | null) => void;
   setView: (name: CameraView) => void;
   zoomBy: (dir: 1 | -1) => void;
+  zoomToBox: (nx: number, ny: number, scale: number) => void;
   setContextMode: (m: ContextMode) => void;
   setRenderMode: (m: RenderMode) => void;
   setMassMode: (m: MassMode) => void;
   setPanel: (p: PanelId | null) => void;
   setLightbox: (src: string | null) => void;
-  /** קישור מתובנה אל המודל: בוחר נושא, פריט, חלופה ומבט, ומשאיר את הלוח פתוח */
+  /** קישור מתובנה אל המודל: בוחר נושא, פריט וחלופה. המצלמה לא זזה: המבט נשאר של המשתמשת */
   go: (g: Go) => void;
   addTask: (t: Omit<WorkTask, 'id' | 'done'>) => void;
   updateTask: (id: string, patch: Partial<WorkTask>) => void;
@@ -87,6 +90,7 @@ export const usePlanStore = create<PlanState>()(
       selectedLot: null,
       view: { name: 'perspective', tick: 0 },
       zoom: { dir: 1, tick: 0 },
+      box: { nx: 0, ny: 0, scale: 1, tick: 0 },
       contextMode: 'schematic',
       renderMode: 'model',
       massMode: 'rights',
@@ -103,13 +107,6 @@ export const usePlanStore = create<PlanState>()(
             selectedItemId: topic ? (itemId ?? topic.items[0]?.id ?? null) : null,
             legendFocus: null,
             selectedLot: topic?.id === 'massing' || topic?.id === 'public' ? s.selectedLot : null,
-            // נושא פיתוח נפתח במבט קרוב על רחובות התוכנית. חזרה למבט הכולל מרחיקה שוב
-            view:
-              topic && topic.id !== 'massing' && s.selectedTopicId !== topic.id && s.view.name !== 'detail'
-                ? { name: 'detail' as const, tick: s.view.tick + 1 }
-                : !topic && s.view.name === 'detail'
-                  ? { name: 'perspective' as const, tick: s.view.tick + 1 }
-                  : s.view,
           };
         }),
       selectItem: (id) => set({ selectedItemId: id, legendFocus: null }),
@@ -199,6 +196,7 @@ export const usePlanStore = create<PlanState>()(
         ),
       setView: (name) => set((s) => ({ view: { name, tick: s.view.tick + 1 } })),
       zoomBy: (dir) => set((s) => ({ zoom: { dir, tick: s.zoom.tick + 1 } })),
+      zoomToBox: (nx, ny, scale) => set((s) => ({ box: { nx, ny, scale, tick: s.box.tick + 1 } })),
       setContextMode: (m) => set({ contextMode: m }),
       setRenderMode: (m) => set({ renderMode: m }),
       setMassMode: (m) => set({ massMode: m }),
@@ -221,7 +219,6 @@ export const usePlanStore = create<PlanState>()(
               selectedItemId: topic ? (g.item ?? topic.items[0]?.id ?? null) : null,
               selectedLot: g.lot ?? null,
             }),
-            ...(g.view && { view: { name: g.view, tick: s.view.tick + 1 } }),
             ...(g.context && { contextMode: g.context }),
             ...(g.render && { renderMode: g.render }),
           };
