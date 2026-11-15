@@ -2,6 +2,7 @@ import { APPENDICES } from '../../data/appendices';
 import { usePlanStore } from '../../store/planStore';
 import PanelShell from './PanelShell';
 import { IconBtn } from '../ui/Icon';
+import AppendixCheck from './AppendixCheck';
 
 /** נספחי התב"ע: מה כל נספח קובע, על מה לשים לב, ופריסה שלו על המודל */
 export default function AppendixPanel() {
@@ -61,6 +62,7 @@ export default function AppendixPanel() {
                     <li key={f}>{f}</li>
                   ))}
                 </ul>
+                <AppendixCheck id={a.id} />
                 {a.accuracy && <p className="mt-2 text-xs text-ink/50">{a.accuracy}</p>}
               </div>
             </li>

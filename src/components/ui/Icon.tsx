@@ -86,6 +86,7 @@ const P: Record<string, ReactNode> = {
   trash: <path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6" />,
   home: <path d="M3 11 12 3l9 8M5 10v11h14V10M10 21v-6h4v6" />,
   external: <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />,
+  section: <path d="M2 19h20M4 19V8h3v11M17 19V5h3v14M12 19v-5M12 14a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />,
   prev: <path d="m9 5 7 7-7 7" />,
   next: <path d="m15 5-7 7 7 7" />,
 };

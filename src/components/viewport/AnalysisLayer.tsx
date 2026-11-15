@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { usePlanStore } from '../../store/planStore';
-import { H, W, X0, Y1, buildingMask, downhill, flowAt, ground, mapCanvas, windField, windTo } from '../../analysis/engine';
+import { H, W, X0, Y1, buildingMask, downhill, flowAt, ground, mapCanvas, setSurface, windField, windTo } from '../../analysis/engine';
 
 const PW = Math.round(W);
 const PH = Math.round(H);
@@ -18,7 +18,7 @@ function MapPlane() {
     return t;
     // במפת יום מלא השעה אינה משנה את התמונה
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a, p.season, p.windFrom, p.day, a === 'shade' && !p.day ? p.hour : 0]);
+  }, [a, p.season, p.windFrom, p.day, p.design, a === 'shade' && !p.day ? p.hour : 0]);
   useEffect(() => () => tex.dispose(), [tex]);
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[X0 + W / 2, 0.9, -(Y1 - H / 2)]} renderOrder={3}>
@@ -108,7 +108,9 @@ function Particles({ kind }: { kind: 'wind' | 'water' }) {
 
 /** קווי גובה של פני הקרקע, כדי להבין לאן הנגר יורד */
 function Contours() {
+  const design = usePlanStore((s) => s.analysisParams.design);
   const geo = useMemo(() => {
+    setSurface(design);
     const pts: number[] = [];
     const step = 12;
     for (let y = Y1 - H; y < Y1; y += step) {
@@ -128,7 +130,7 @@ function Contours() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
     return g;
-  }, []);
+  }, [design]);
   return (
     <lineSegments geometry={geo} renderOrder={4}>
       <lineBasicMaterial color="#5B4A2E" transparent opacity={0.35} depthWrite={false} />

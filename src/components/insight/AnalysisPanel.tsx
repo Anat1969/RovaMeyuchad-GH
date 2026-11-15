@@ -14,6 +14,8 @@ import {
   WALK,
   type Analysis,
   type Season,
+  designShift,
+  setSurface,
 } from '../../analysis/engine';
 import { RULES } from '../../data/rules';
 import { usePlanStore } from '../../store/planStore';
@@ -32,7 +34,7 @@ interface Tip {
 }
 
 /** מחשב את הממצאים וההמלצות של הניתוח הפעיל */
-function useFindings(a: Analysis, season: Season, windFrom: number) {
+function useFindings(a: Analysis, season: Season, windFrom: number, design: boolean) {
   return useMemo(() => {
     if (a === 'shade') {
       const morning = alongStreets(shadeFraction(season, 8, 12));
@@ -73,6 +75,7 @@ function useFindings(a: Analysis, season: Season, windFrom: number) {
       };
     }
     if (a === 'water') {
+      setSurface(design);
       const by = new Map<string, { s: number; c: number }>();
       for (const w of WALK) {
         const e = by.get(w.n) ?? { s: 0, c: 0 };
@@ -83,14 +86,20 @@ function useFindings(a: Analysis, season: Season, windFrom: number) {
       const streets = [...by].filter(([, e]) => e.c >= 12).map(([n, e]) => ({ n, v: e.s / e.c })).sort((x, y) => y.v - x.v);
       const sinks = sinksInPlan().length;
       return {
-        title: `הנגר יורד בעיקר ל${mainSlope()}, ונעצר ב-${sinks} שקעים בתחום המגרשים`,
-        lead: 'הפרש הגובה בשטח הוא כ-34 מ\'. הקווים הכחולים מראים לאן המים זורמים על פני הקרקע הקיימים, והצבע הכהה מראה איפה הם מתרכזים. שקע: נקודה נמוכה שמנקזת אליה 6 דונם לפחות.',
+        title: design ? `לפי מפלסי התכנון, הנגר יורד בעיקר ל${mainSlope()} ומתרכז ב${streets[0]?.n ?? 'רחובות הראשיים'}` : `הנגר יורד בעיקר ל${mainSlope()}, ונעצר ב-${sinks} שקעים בתחום המגרשים`,
+        lead: design
+          ? `החישוב נעשה על מפלסי התכנון של הרחובות: 28 מפלסי שוחות מנספח הניקוז, שמשנים את הקרקע הקיימת ב-${designShift().toFixed(1)} מ' בממוצע. הקווים הכחולים מראים לאן המים זורמים, והצבע הכהה איפה הם מתרכזים. במצב המתוכנן אין שקעים: ההנחה היא שכל רחוב מתנקז במורד אל קולטן.`
+          : 'החישוב נעשה על פני הקרקע הקיימים, לפני הפיתוח. הפרש הגובה בשטח הוא כ-34 מ\'. הקווים הכחולים מראים לאן המים זורמים, והצבע הכהה איפה הם מתרכזים. שקע: נקודה נמוכה שמנקזת אליה 6 דונם לפחות.',
         bars: { label: 'ריכוז הנגר, לפי רחוב', list: streets, good: 'low' as const },
         tips: [
           { t: `למקם את ערוגות הגשם ברחובות שמרכזים נגר: ${names(streets)}.`, d: 'שם רצועת הביוסוואל תקלוט הכי הרבה מים. ברחובות האחרים אפשר רצועה צרה יותר.', go: { topic: 'water' } },
-          { t: 'לתכנן השהיה בנקודות ההיקוות.', d: 'בנקודות הנמוכות המים נעצרים. שם מתאימים גן גשם, שטח ירוק מונמך או בור חלחול, ולא כניסה לחניון.', go: { topic: 'water' } },
+          design
+            ? { t: 'למקם השהיה בקצה התחתון של כל רחוב שמרכז נגר.', d: 'שם מצטברת הספיקה הגדולה ביותר לפני הכניסה לצנרת. גן גשם או רצועה מונמכת בנקודה הזו מקטינים את העומס על הקווים.', go: { topic: 'water' } }
+            : { t: 'לתכנן השהיה בנקודות ההיקוות.', d: 'בנקודות הנמוכות המים נעצרים. שם מתאימים גן גשם, שטח ירוק מונמך או בור חלחול, ולא כניסה לחניון.', go: { topic: 'water' } },
           { t: 'לחבר את הרצועות לרשת רציפה, במורד השיפוע.', d: 'ביוסוואל מקוטע לא מוביל מים. נדרש רצף מהרחוב הגבוה אל השטח הפתוח הנמוך.' },
-          { t: 'לחזור על הניתוח עם מפלסי התכנון.', d: 'הנתון כאן הוא הקרקע הקיימת, ברזולוציה של כ-30 מ\'. עבודות העפר ישנו את הזרימה, ולכן נדרש נספח ניקוז (מדד 25).' },
+          design
+            ? { t: 'להשוות בין שני המצבים: קרקע קיימת מול מפלסי תכנון.', d: 'רחוב שמרכז נגר רק במצב המתוכנן הוא תוצאה של עבודות העפר, ושם נדרש פתרון השהיה שלא היה נחוץ קודם.' }
+            : { t: 'לעבור למפלסי התכנון.', d: 'הקרקע הקיימת מראה את הניקוז הטבעי. עבודות העפר ישנו את הזרימה, ולכן ההחלטות מתקבלות על המצב המתוכנן.' },
         ] as Tip[],
       };
     }
@@ -106,7 +115,7 @@ function useFindings(a: Analysis, season: Season, windFrom: number) {
         { t: 'להצליל את מוקדי השהייה.', d: 'תחנות אוטובוס, ספסלים ומעברי חצייה באזורים האדומים צריכים צל משלהם.', go: { topic: 'furniture' } },
       ] as Tip[],
     };
-  }, [a, season, windFrom]);
+  }, [a, season, windFrom, design]);
 }
 
 export default function AnalysisPanel({ a }: { a: Analysis }) {
@@ -117,7 +126,7 @@ export default function AnalysisPanel({ a }: { a: Analysis }) {
   const go = usePlanStore((s) => s.go);
   const playing = usePlanStore((s) => s.sunPlaying);
   const setPlaying = usePlanStore((s) => s.setSunPlaying);
-  const f = useFindings(a, p.season, p.windFrom);
+  const f = useFindings(a, p.season, p.windFrom, p.design);
 
   // תנועת השמש: שעה אחרי שעה
   useEffect(() => {
@@ -180,6 +189,16 @@ export default function AnalysisPanel({ a }: { a: Analysis }) {
             )}
           </>
         )}
+        {a === 'water' && (
+          <div className="grid grid-cols-2 gap-1">
+            <button title="ניקוז לפי מפלסי הרחובות המתוכננים" aria-pressed={p.design} onClick={() => set({ design: true })} className={`btn py-1.5 text-xs ${p.design ? 'btn-on' : ''}`}>
+              מפלסי התכנון
+            </button>
+            <button title="ניקוז טבעי, לפני הפיתוח" aria-pressed={!p.design} onClick={() => set({ design: false })} className={`btn py-1.5 text-xs ${!p.design ? 'btn-on' : ''}`}>
+              קרקע קיימת
+            </button>
+          </div>
+        )}
         {a === 'wind' && (
           <div className="grid grid-cols-4 gap-1">
             {WIND_DIRS.map((w) => (
@@ -238,7 +257,7 @@ export default function AnalysisPanel({ a }: { a: Analysis }) {
       <p className="mt-5 text-xs leading-relaxed text-ink/50">
         זהו מודל מפושט להמחשה ולכיוון תכנוני, ולא סימולציה הנדסית. הבניינים הם מעטפות הזכויות, ולא התכנון הסופי. העצים ממוקמים לפי כללי האוגדן, ולא לפי תוכנית נטיעות.
         {a === 'wind' && ' הרוח אינה חישוב זרימה: היא מסמנת אזור מוגן מאחורי כל בניין, ואזור האצה סביב מגדלים.'}
-        {a === 'water' && ' הגבהים הם של הקרקע הקיימת (SRTM, רזולוציה של כ-30 מ\'), ולא של התכנון.'}
+        {a === 'water' && ' הקרקע הקיימת: SRTM, רזולוציה של כ-30 מ\'. מפלסי התכנון: 28 נקודות לאורך הרחובות בלבד, שנקראו בעין מנספח הניקוז. בין הרחובות ובתוך המגרשים המשטח הוא אינטרפולציה.'}
         {a === 'heat' && ' המדד אינו טמפרטורה.'}
       </p>
     </PanelShell>

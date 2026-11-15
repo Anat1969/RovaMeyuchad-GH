@@ -10,6 +10,8 @@ import { IconBtn } from '../ui/Icon';
 import { DESIGNS } from '../../data/designData';
 import AnalysisLayer from './AnalysisLayer';
 import AppendixSheet from './AppendixSheet';
+import ExistingTrees from './ExistingTrees';
+import FunnelVolume from './FunnelVolume';
 import { APPENDICES } from '../../data/appendices';
 import { sunVector, type Analysis } from '../../analysis/engine';
 import { CONTEXT } from '../../data/contextData';
@@ -199,6 +201,8 @@ export default function Viewport3D() {
   const setMassMode = usePlanStore((s) => s.setMassMode);
   const viewName = usePlanStore((s) => s.view.name);
   const setView = usePlanStore((s) => s.setView);
+  const panel = usePlanStore((s) => s.panel);
+  const setPanel = usePlanStore((s) => s.setPanel);
   const zoomToBox = usePlanStore((s) => s.zoomToBox);
   // כלי הזום למלבן: גוררים מלבן על המודל
   const [boxMode, setBoxMode] = useState(false);
@@ -249,6 +253,8 @@ export default function Viewport3D() {
         <PublicLots />
         <AnalysisLayer />
         <AppendixSheet />
+        <ExistingTrees />
+        <FunnelVolume />
         <PlanLayers />
       </Canvas>
 
@@ -263,6 +269,7 @@ export default function Viewport3D() {
         <IconBtn icon="top" label="מבט על" on={viewName === 'top'} onClick={() => setView('top')} />
         <IconBtn icon="perspective" label="פרספקטיבה" on={viewName === 'perspective'} onClick={() => setView('perspective')} />
         <IconBtn icon="street" label="מבט רחוב" on={viewName === 'street'} onClick={() => setView('street')} />
+        <IconBtn icon="section" label="חתך רחוב" on={panel === 'section'} onClick={() => setPanel(panel === 'section' ? null : 'section')} />
         <span className="my-0.5 h-px bg-ink/15" />
         <IconBtn icon="map" label="רקע רחובות" on={!real && mode === 'schematic'} disabled={real} onClick={() => setMode('schematic')} />
         <IconBtn icon="satellite" label="רקע לוויין" on={real || mode === 'satellite'} disabled={real} onClick={() => setMode('satellite')} />

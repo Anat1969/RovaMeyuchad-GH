@@ -3,6 +3,7 @@ import { PUBLIC } from '../data/publicData';
 import { KIND } from '../data/publicKinds';
 import { CONTEXT } from '../data/contextData';
 import { DEM } from '../data/demData';
+import { DESIGN_LEVELS } from '../data/designLevels';
 import { offsetLine, type Pt } from '../components/viewport/geometry';
 
 /**
@@ -278,17 +279,121 @@ export function windField(fromDeg: number): Float32Array {
 }
 
 // ---------- ניקוז
-const cellAt = (i: number, j: number) => DEM.h[j * DEM.nx + i];
-/** גובה הקרקע בנקודה, באינטרפולציה */
-export function ground(x: number, y: number) {
+/** פני הקרקע שעליהם מחושב הניקוז: הקרקע הקיימת, או הקרקע עם מפלסי התכנון של הרחובות */
+let HGT: ArrayLike<number> = DEM.h;
+let designH: Float32Array | null = null;
+let designOn = false;
+const bilinear = (arr: ArrayLike<number>, x: number, y: number) => {
   const fx = Math.max(0, Math.min(DEM.nx - 1.001, (x - DEM.x0) / DEM.cell));
   const fy = Math.max(0, Math.min(DEM.ny - 1.001, (y - DEM.y0) / DEM.cell));
   const i = Math.floor(fx);
   const j = Math.floor(fy);
   const a = fx - i;
   const b = fy - j;
-  return cellAt(i, j) * (1 - a) * (1 - b) + cellAt(i + 1, j) * a * (1 - b) + cellAt(i, j + 1) * (1 - a) * b + cellAt(i + 1, j + 1) * a * b;
+  const v = (ii: number, jj: number) => arr[jj * DEM.nx + ii];
+  return v(i, j) * (1 - a) * (1 - b) + v(i + 1, j) * a * (1 - b) + v(i, j + 1) * (1 - a) * b + v(i + 1, j + 1) * a * b;
+};
+/** מילוי שקעים (priority flood): כל תא מקבל מוצא במורד עד שפת השטח.
+ * במשטח מתוכנן אין שקעים, כי הרחובות מתנקזים לקולטנים. השקעים שנוצרים מהאינטרפולציה הם רעש */
+function fillSinks(h: Float32Array): Float32Array {
+  const { nx, ny } = DEM;
+  const out = Float32Array.from(h);
+  const done = new Uint8Array(nx * ny);
+  const heap: number[] = [];
+  const push = (k: number) => {
+    heap.push(k);
+    let i = heap.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (out[heap[p]] <= out[heap[i]]) break;
+      [heap[p], heap[i]] = [heap[i], heap[p]];
+      i = p;
+    }
+  };
+  const pop = () => {
+    const top = heap[0];
+    const last = heap.pop()!;
+    if (heap.length) {
+      heap[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1;
+        const r = l + 1;
+        let m = i;
+        if (l < heap.length && out[heap[l]] < out[heap[m]]) m = l;
+        if (r < heap.length && out[heap[r]] < out[heap[m]]) m = r;
+        if (m === i) break;
+        [heap[m], heap[i]] = [heap[i], heap[m]];
+        i = m;
+      }
+    }
+    return top;
+  };
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      if (i === 0 || j === 0 || i === nx - 1 || j === ny - 1) {
+        done[j * nx + i] = 1;
+        push(j * nx + i);
+      }
+    }
+  }
+  while (heap.length) {
+    const k = pop();
+    const i = k % nx;
+    const j = (k - i) / nx;
+    for (let dj = -1; dj <= 1; dj++) {
+      for (let di = -1; di <= 1; di++) {
+        const a = i + di;
+        const b = j + dj;
+        if (a < 0 || b < 0 || a >= nx || b >= ny) continue;
+        const n = b * nx + a;
+        if (done[n]) continue;
+        done[n] = 1;
+        out[n] = Math.max(out[n], out[k] + 0.002);
+        push(n);
+      }
+    }
+  }
+  return out;
 }
+/** משטח התכנון: הקרקע הקיימת, מתוקנת לפי 28 מפלסי השוחות. התיקון מלא עד 80 מ' מנקודה, ודועך עד 200 מ' */
+function designSurface() {
+  if (designH) return designH;
+  const diffs = DESIGN_LEVELS.map(([x, y, z]) => z - bilinear(DEM.h, x, y));
+  const out = new Float32Array(DEM.nx * DEM.ny);
+  for (let j = 0; j < DEM.ny; j++) {
+    for (let i = 0; i < DEM.nx; i++) {
+      const x = DEM.x0 + i * DEM.cell;
+      const y = DEM.y0 + j * DEM.cell;
+      let sw = 0;
+      let sd = 0;
+      let dmin = Infinity;
+      DESIGN_LEVELS.forEach(([px, py], k) => {
+        const d = Math.max(6, Math.hypot(px - x, py - y));
+        const w = 1 / (d * d);
+        sw += w;
+        sd += w * diffs[k];
+        dmin = Math.min(dmin, d);
+      });
+      const fade = Math.max(0, Math.min(1, 1 - (dmin - 80) / 120));
+      out[j * DEM.nx + i] = DEM.h[j * DEM.nx + i] + (fade * sd) / sw;
+    }
+  }
+  designH = fillSinks(out);
+  return designH;
+}
+/** בוחר את פני הקרקע לחישוב הניקוז */
+export function setSurface(design: boolean) {
+  designOn = design;
+  HGT = design ? designSurface() : DEM.h;
+}
+/** ההפרש הממוצע, בערך מוחלט, בין מפלסי התכנון לקרקע הקיימת */
+export const designShift = () => DESIGN_LEVELS.reduce((s, [x, y, z]) => s + Math.abs(z - bilinear(DEM.h, x, y)), 0) / DESIGN_LEVELS.length;
+const cellAt = (i: number, j: number) => HGT[j * DEM.nx + i];
+/** גובה הקרקע בנקודה, באינטרפולציה, על המשטח שנבחר */
+export const ground = (x: number, y: number) => bilinear(HGT, x, y);
+/** גובה הקרקע הקיימת בנקודה */
+export const groundExisting = (x: number, y: number) => bilinear(DEM.h, x, y);
 /** כיוון הירידה והשיפוע בנקודה */
 export function downhill(x: number, y: number): { d: Pt; slope: number } {
   const e = 6;
@@ -298,10 +403,11 @@ export function downhill(x: number, y: number): { d: Pt; slope: number } {
   return { d: s > 1e-5 ? [-gx / s, -gy / s] : [0, 0], slope: s };
 }
 
-let flowCache: { acc: Float32Array; sinks: Pt[] } | null = null;
+const flowCaches: Record<string, { acc: Float32Array; sinks: Pt[] }> = {};
 /** הצטברות נגר: כמה תאים מנקזים אל כל תא (שיטת D8), ונקודות היקוות */
 export function flow() {
-  if (flowCache) return flowCache;
+  const key = designOn ? 'design' : 'existing';
+  if (flowCaches[key]) return flowCaches[key];
   const { nx, ny } = DEM;
   const n = nx * ny;
   const to = new Int32Array(n).fill(-1);
@@ -326,7 +432,7 @@ export function flow() {
       to[j * nx + i] = bi;
     }
   }
-  const order = Array.from({ length: n }, (_, k) => k).sort((a, b) => DEM.h[b] - DEM.h[a]);
+  const order = Array.from({ length: n }, (_, k) => k).sort((a, b) => HGT[b] - HGT[a]);
   const acc = new Float32Array(n).fill(1);
   for (const k of order) if (to[k] >= 0) acc[to[k]] += acc[k];
   // שקע משמעותי: נקודה נמוכה שמנקזת אליה לפחות כ-6 דונם. שקעים קטנים הם רעש של נתוני הגובה
@@ -336,8 +442,8 @@ export function flow() {
       if (to[k] < 0 && acc[k] >= 40) sinks.push([DEM.x0 + i * DEM.cell, DEM.y0 + j * DEM.cell]);
     }
   }
-  flowCache = { acc, sinks };
-  return flowCache;
+  flowCaches[key] = { acc, sinks };
+  return flowCaches[key];
 }
 /** הצטברות הנגר בנקודה, מנורמלת לוגריתמית ל-0 עד 1 */
 export function flowAt(x: number, y: number) {
@@ -410,11 +516,13 @@ export interface Params {
   hour: number;
   windFrom: number;
   day: boolean; // הצללות: כל היום, או השעה הנוכחית
+  design: boolean; // ניקוז: על מפלסי התכנון, או על הקרקע הקיימת
 }
 export function field(a: Analysis, p: Params): Float32Array {
   if (a === 'shade') return shadeFraction(p.season);
   if (a === 'wind') return windField(p.windFrom);
   if (a === 'heat') return heatField(p.season);
+  setSurface(p.design);
   return flowRaster();
 }
 export function mapCanvas(a: Analysis, p: Params): HTMLCanvasElement {

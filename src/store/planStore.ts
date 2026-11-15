@@ -108,7 +108,7 @@ export const usePlanStore = create<PlanState>()(
       tasks: seedTasks(),
       lightbox: null,
       analysis: null,
-      analysisParams: { season: 'summer', hour: 10, windFrom: 315, day: false },
+      analysisParams: { season: 'summer', hour: 10, windFrom: 315, day: false, design: true },
       sunPlaying: true,
       appendix: null,
       savedAt: 0,
@@ -249,6 +249,17 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: 'rova3d-plan-v6',
+      version: 1,
+      // גרסה 1: פרקי הנטיעות עוברים ל"חלקי", כי במצגת הם מסומנים "יעודכן בתכנון מפורט". שאר העריכות נשמרות
+      migrate: (old, v) => {
+        const s = old as { topics?: PlanTopic[] };
+        if (v < 1 && s.topics) {
+          s.topics = s.topics.map((t) =>
+            t.id !== 'planting' ? t : { ...t, status: 'partial', items: t.items.map((i) => (i.status === 'complete' ? { ...i, status: 'partial' as ItemStatus } : i)) },
+          );
+        }
+        return s as never;
+      },
       partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode, renderMode: s.renderMode, massMode: s.massMode, tasks: s.tasks }),
     },
   ),

@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CONTEXT } from '../../data/contextData';
+import { ROUND, ROUNDABOUTS } from '../../data/junctions';
 import { usePlanStore } from '../../store/planStore';
 import { headings, offsetLine, pushRibbon, ribbonGeometry, type Pt } from './geometry';
 import { resolveStyle, type PieceRef } from './layerStyle';
@@ -11,6 +12,7 @@ import { resolveStyle, type PieceRef } from './layerStyle';
  * הרחובות אמיתיים (קטעים שלצד המגרשים). המיקום של כל רכיב לאורכם סכמטי:
  * המרווחים לפי הדרישות שב-data/rules.ts: עץ כל 6 מ', פתח נטיעה 1.2 על 2.4 מ',
  * עמוד תאורה 3 מ' מגזע, וספסל כל 48 מ' בכל צד.
+ * בצמתים ובכיכרות הרצועות והעצים נעצרים, ובמקומם: פינות מרוצפות, מעברי חצייה ואי מרכזי.
  */
 
 type Shape = 'box' | 'sphere' | 'cone' | 'cyl';
@@ -25,6 +27,7 @@ interface InstGroup extends PieceRef {
 }
 interface RibbonGroup extends PieceRef {
   positions: number[];
+  realOnly?: boolean; // מוצג רק בהדמיה הריאליסטית
 }
 
 /** נוף עץ ריאליסטי: שלושה גושים חופפים במקום כדור אחד */
@@ -44,27 +47,152 @@ const GEO: Record<Shape, THREE.BufferGeometry> = {
   cyl: new THREE.CylinderGeometry(1, 1, 1, 8),
 };
 
+interface Junction {
+  c: Pt;
+  r: number; // הרדיוס שבו נעצרות רצועות הרחוב
+  road: number; // רדיוס משטח האספלט
+  round: boolean;
+}
+const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+/** מאתר צמתים: חיתוך בין שני רחובות, או קצה של רחוב שנפגש ברחוב אחר בזווית */
+function findJunctions(): Junction[] {
+  const runs = CONTEXT.planRuns;
+  const hits: { p: Pt; half: number }[] = [];
+  const cross = (a: Pt, b: Pt, c: Pt, d: Pt): Pt | null => {
+    const rx = b[0] - a[0];
+    const ry = b[1] - a[1];
+    const sx = d[0] - c[0];
+    const sy = d[1] - c[1];
+    const den = rx * sy - ry * sx;
+    if (Math.abs(den) < 1e-6) return null;
+    const t = ((c[0] - a[0]) * sy - (c[1] - a[1]) * sx) / den;
+    const u = ((c[0] - a[0]) * ry - (c[1] - a[1]) * rx) / den;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? [a[0] + rx * t, a[1] + ry * t] : null;
+  };
+  const head = runs.map((r) => headings(r.pts as Pt[]));
+  for (let i = 0; i < runs.length; i++) {
+    const A = runs[i].pts as Pt[];
+    for (let j = 0; j < runs.length; j++) {
+      if (i === j) continue;
+      const B = runs[j].pts as Pt[];
+      const half = Math.max(runs[i].w, runs[j].w) / 2;
+      if (j > i) {
+        for (let m = 0; m + 1 < A.length; m++) {
+          for (let n = 0; n + 1 < B.length; n++) {
+            const x = cross(A[m], A[m + 1], B[n], B[n + 1]);
+            if (x) hits.push({ p: x, half });
+          }
+        }
+      }
+      // קצה של רחוב שנוגע ברחוב אחר. זווית קטנה: המשך של אותו רחוב או מסלול מקביל, ולא צומת
+      for (const e of [0, A.length - 1]) {
+        let best = Infinity;
+        let bn = -1;
+        B.forEach((q, n) => {
+          const d = dist(A[e], q);
+          if (d < best) {
+            best = d;
+            bn = n;
+          }
+        });
+        if (best > runs[j].w / 2 + 9) continue;
+        if (Math.abs(Math.sin(head[i][e] - head[j][bn])) > 0.5) hits.push({ p: B[bn], half });
+      }
+    }
+  }
+  // איחוד נקודות קרובות לצומת אחד: שני מסלולים של אותה שדרה נחתכים פעמיים
+  const groups: { pts: Pt[]; half: number }[] = [];
+  for (const h of hits) {
+    const g = groups.find((k) => k.pts.some((q) => dist(q, h.p) < 30));
+    if (g) {
+      g.pts.push(h.p);
+      g.half = Math.max(g.half, h.half);
+    } else groups.push({ pts: [h.p], half: h.half });
+  }
+  const out: Junction[] = ROUNDABOUTS.map((r) => ({ c: r.c, r: ROUND.clear, road: ROUND.outer, round: true }));
+  for (const g of groups) {
+    const c: Pt = [g.pts.reduce((a, q) => a + q[0], 0) / g.pts.length, g.pts.reduce((a, q) => a + q[1], 0) / g.pts.length];
+    if (out.some((j) => j.round && dist(j.c, c) < 38)) continue;
+    const spread = Math.max(...g.pts.map((q) => dist(q, c)));
+    out.push({ c, r: Math.min(32, g.half + 8.5 + spread), road: Math.min(24, g.half + 2 + spread), round: false });
+  }
+  return out;
+}
+
+/** מוסיף למערך טבעת שטוחה (או עיגול, כשהרדיוס הפנימי אפס) */
+function pushDisc(out: number[], c: Pt, r0: number, r1: number, y: number) {
+  const N = 40;
+  for (let k = 0; k < N; k++) {
+    const a = (k / N) * Math.PI * 2;
+    const b = ((k + 1) / N) * Math.PI * 2;
+    const p = (r: number, t: number) => [c[0] + Math.cos(t) * r, y, -(c[1] + Math.sin(t) * r)];
+    out.push(...p(r1, a), ...p(r1, b), ...p(r0, b));
+    if (r0 > 0) out.push(...p(r1, a), ...p(r0, b), ...p(r0, a));
+  }
+}
+
 function build() {
   const inst = new Map<string, InstGroup>();
   const ribbons = new Map<string, RibbonGroup>();
+  const junctions = findJunctions();
+  const inJ = (p: Pt) => junctions.some((j) => dist(j.c, p) < j.r);
   const key = (r: PieceRef, shape = '') => `${r.layer}|${r.item}|${r.idx ?? ''}|${r.fixed ?? ''}|${shape}`;
-  const add = (ref: PieceRef, shape: Shape, at: Pt, y: number, s: Inst['s'], r = 0) => {
+  const put = (ref: PieceRef, shape: Shape, at: Pt, y: number, s: Inst['s'], r = 0) => {
     const k = key(ref, shape);
     if (!inst.has(k)) inst.set(k, { ...ref, shape, list: [] });
     inst.get(k)!.list.push({ p: [at[0], y, -at[1]], s, r });
   };
-  const strip = (ref: PieceRef, pts: Pt[], width: number, y: number) => {
-    const k = key(ref);
-    if (!ribbons.has(k)) ribbons.set(k, { ...ref, positions: [] });
-    pushRibbon(ribbons.get(k)!.positions, pts, width, y);
+  // רכיב רחוב רגיל אינו מוצב בתוך צומת
+  const add = (ref: PieceRef, shape: Shape, at: Pt, y: number, s: Inst['s'], r = 0) => {
+    if (!inJ(at)) put(ref, shape, at, y, s, r);
   };
+  const band = (ref: PieceRef, tag = '', realOnly = false) => {
+    const k = key(ref) + tag;
+    if (!ribbons.has(k)) ribbons.set(k, { ...ref, positions: [], realOnly });
+    return ribbons.get(k)!.positions;
+  };
+  // רצועה לאורך הרחוב, שנקטעת בכניסה לצומת
+  const strip = (ref: PieceRef, pts: Pt[], width: number, y: number, through = false) => {
+    if (through) return pushRibbon(band(ref), pts, width, y);
+    let part: Pt[] = [];
+    const flush = () => {
+      if (part.length > 1) pushRibbon(band(ref), part, width, y);
+      part = [];
+    };
+    for (const p of pts) {
+      if (inJ(p)) flush();
+      else part.push(p);
+    }
+    flush();
+  };
+
+  // משטחי הצומת: ריצוף בפינות, אספלט במרכז, ובכיכר גם אי מגונן עם עץ
+  const PAVE: PieceRef = { layer: 'paving', item: 'paving-main', idx: 0 };
+  const ASPHALT: PieceRef = { layer: 'road', item: 'road', fixed: '#5B5C5F' };
+  for (const j of junctions) {
+    pushDisc(band(PAVE, 'j', true), j.c, 0, j.r, 0.05);
+    pushDisc(band(ASPHALT), j.c, 0, j.road, 0.09);
+    if (j.round) {
+      pushDisc(band({ layer: 'paving', item: 'paving-main', idx: 1 }), j.c, ROUND.island, ROUND.apron, 0.2);
+      pushDisc(band({ layer: 'planting', item: 'groundcover', idx: 0 }), j.c, 0, ROUND.island, 0.26);
+      const tree: PieceRef = { layer: 'planting', item: 'trees-main', idx: 0 };
+      put({ ...tree, idx: undefined, fixed: '#7A6652' }, 'cyl', j.c, 1.6, [0.22, 3.2, 0.22]);
+      put(tree, 'sphere', j.c, 5, [3, 2.4, 3]);
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2;
+        put({ layer: 'planting', item: 'groundcover', idx: k % 5 }, 'sphere', [j.c[0] + Math.cos(a) * 5, j.c[1] + Math.sin(a) * 5], 0.45, [0.9, 0.5, 0.9]);
+      }
+    }
+  }
 
   CONTEXT.planRuns.forEach((run, ri) => {
     const half = run.w / 2;
-    strip({ layer: 'road', item: 'road', fixed: '#5B5C5F' }, run.pts, run.w, 0.08);
-    const ang = headings(run.pts);
+    const line = run.pts as Pt[];
+    strip({ layer: 'road', item: 'road', fixed: '#5B5C5F' }, line, run.w, 0.08, true);
+    const ang = headings(line);
     for (const side of [1, -1]) {
-      const at = (d: number) => offsetLine(run.pts, side * (half + d));
+      const at = (d: number) => offsetLine(line, side * (half + d));
       // ריצוף, לפי אזורי החלופה שנבחרה: רצועת הליכה, רצועת שירות, ורצועת חנייה בשולי הכביש
       strip({ layer: 'paving', item: 'paving-main', idx: 0 }, at(4.4), 3.2, 0.16);
       strip({ layer: 'paving', item: 'paving-main', idx: 1 }, at(2.3), 1, 0.18);
@@ -105,17 +233,19 @@ function build() {
         }
       });
     }
-    // נגישות: משטח אזהרה בשני קצות הקטע, ומעבר חצייה בתחילתו
-    const ends = [0, run.pts.length - 1];
-    for (const e of ends) {
-      add({ layer: 'accessibility', item: 'accessibility-main', idx: 0 }, 'box', run.pts[e], 0.25, [0.8, 0.1, run.w + 6], ang[e]);
-    }
-    for (const k of [1, 2, 3]) {
-      if (k < run.pts.length) {
-        const a = run.pts[k - 1];
-        const b = run.pts[k];
-        const mid: Pt = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-        add({ layer: 'accessibility', item: 'accessibility-main', idx: 1 }, 'box', mid, 0.22, [0.9, 0.06, run.w], ang[k]);
+    // נגישות: מעבר חצייה בכל כניסה של הרחוב לצומת, ומשטח אזהרה בשתי המדרכות
+    for (let i = 0; i + 1 < line.length; i++) {
+      const a = inJ(line[i]);
+      const b = inJ(line[i + 1]);
+      if (a === b) continue;
+      const k = a ? i + 1 : i;
+      const p = line[k];
+      const n: Pt = [-Math.sin(ang[k]), Math.cos(ang[k])];
+      for (let t = -half + 0.6; t <= half - 0.6; t += 1.1) {
+        put({ layer: 'accessibility', item: 'accessibility-main', idx: 1 }, 'box', [p[0] + n[0] * t, p[1] + n[1] * t], 0.13, [3, 0.05, 0.55], ang[k]);
+      }
+      for (const sd of [1, -1]) {
+        put({ layer: 'accessibility', item: 'accessibility-main', idx: 0 }, 'box', [p[0] + n[0] * sd * (half + 0.7), p[1] + n[1] * sd * (half + 0.7)], 0.2, [3, 0.1, 0.8], ang[k]);
       }
     }
   });
@@ -192,7 +322,7 @@ function Ribbon({ g }: { g: RibbonGroup }) {
   const style = useStyle(g);
   const real = useReal();
   // הכביש עצמו מוצג רק בהדמיה הריאליסטית. במודל הוא חלק מסכמת הרחובות
-  if (g.layer === 'road' && !real) return null;
+  if ((g.layer === 'road' || g.realOnly) && !real) return null;
   return (
     <mesh
       geometry={geo}
