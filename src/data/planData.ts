@@ -1,0 +1,173 @@
+import type { PlanTopic } from '../types/plan';
+
+// נתוני ברירת מחדל: מבוסס על תוכנית הבינוי של הרובע המיוחד אשדוד
+export const PLAN_TOPICS: PlanTopic[] = [
+  {
+    id: 'paving',
+    nameHe: 'ריצוף',
+    status: 'complete',
+    layerColor: '#E8DCC8',
+    sortOrder: 1,
+    items: [
+      {
+        id: 'paving-main',
+        nameHe: 'ריצוף רחוב ראשי',
+        description: 'פורפירו שפוך — השראת חולות אשדוד. 280 ₪/מ"ר',
+        image: undefined,
+        legend: [
+          { color: '#E8DCC8', label: 'פורפירו בהיר — רחוב ראשי' },
+          { color: '#C4A882', label: 'פורפירו כהה — גדה ומסגרת' },
+          { color: '#8B6F4E', label: 'גרניט — פס מוליך' },
+        ],
+        status: 'complete',
+        specRef: 'עמ\' 8–12',
+      },
+      {
+        id: 'paving-secondary',
+        nameHe: 'ריצוף רחוב משני',
+        description: 'ריצוף מגורים — 110 ₪/מ"ר',
+        image: undefined,
+        legend: [
+          { color: '#D4C8B0', label: 'ריצוף מגורים — גוון חול' },
+          { color: '#B8A898', label: 'אבן מקומית — מסגרת' },
+        ],
+        status: 'complete',
+        specRef: 'עמ\' 13–15',
+      },
+    ],
+  },
+  {
+    id: 'planting',
+    nameHe: 'נטיעות',
+    status: 'complete',
+    layerColor: '#4A7C59',
+    sortOrder: 2,
+    items: [
+      {
+        id: 'trees-main',
+        nameHe: 'עצי קו ראשי',
+        description: 'רווח 6 מ\' בין עצים. מינים ים-תיכוניים-חוליים.',
+        image: undefined,
+        legend: [
+          { color: '#2D5A3D', label: 'עץ חרוב', latinName: 'Ceratonia siliqua' },
+          { color: '#4A7C59', label: 'שיטה', latinName: 'Acacia sp.' },
+          { color: '#6B9E6B', label: 'ברוש עמודי', latinName: 'Cupressus sempervirens' },
+        ],
+        status: 'complete',
+        specRef: 'עמ\' 16–18',
+      },
+      {
+        id: 'groundcover',
+        nameHe: 'כיסוי קרקע ו-Bioswales',
+        description: 'צמחיית בתה ים-תיכונית-חולית בגדות ביוסוואלס.',
+        image: undefined,
+        legend: [
+          { color: '#7CB87C', label: 'Pennisetum setaceum', latinName: 'Pennisetum setaceum' },
+          { color: '#8FC88F', label: 'Muhlenbergia capillaris', latinName: 'Muhlenbergia capillaris' },
+          { color: '#A8D4A8', label: 'Gaura lindheimeri', latinName: 'Gaura lindheimeri' },
+          { color: '#C0E0C0', label: 'Bulbine frutescens', latinName: 'Bulbine frutescens' },
+          { color: '#D8F0D8', label: 'לענה', latinName: 'Artemisia arborescens' },
+        ],
+        status: 'complete',
+        specRef: 'עמ\' 19–20',
+      },
+    ],
+  },
+  {
+    id: 'lighting',
+    nameHe: 'תאורה',
+    status: 'pending',
+    layerColor: '#F5C842',
+    sortOrder: 3,
+    items: [
+      {
+        id: 'lighting-main',
+        nameHe: 'תאורת רחוב',
+        description: '',
+        image: undefined,
+        legend: [],
+        status: 'pending',
+        note: 'פרק תאורה — חותמת "להשלמה" (עמ\' 21)',
+        specRef: 'עמ\' 21',
+      },
+    ],
+  },
+  {
+    id: 'furniture',
+    nameHe: 'ריהוט רחוב',
+    status: 'pending',
+    layerColor: '#6B8CAE',
+    sortOrder: 4,
+    items: [
+      {
+        id: 'furniture-main',
+        nameHe: 'ריהוט — כללי',
+        description: '',
+        image: undefined,
+        legend: [],
+        status: 'pending',
+        note: '"יעודכן בתכנון מפורט" — טרם נקבע',
+        specRef: 'עמ\' 23',
+      },
+    ],
+  },
+  {
+    id: 'planting-pits',
+    nameHe: 'פתחי נטיעה',
+    status: 'pending',
+    layerColor: '#8B6F4E',
+    sortOrder: 5,
+    items: [
+      {
+        id: 'pits-main',
+        nameHe: 'ספציפיקציית בורות נטיעה',
+        description: '',
+        image: undefined,
+        legend: [],
+        status: 'pending',
+        note: 'פרק פתחי נטיעה — חותמת "להשלמה" (עמ\' 22)',
+        specRef: 'עמ\' 22',
+      },
+    ],
+  },
+  {
+    id: 'water',
+    nameHe: 'ניקוז ומים',
+    status: 'partial',
+    layerColor: '#4A90D9',
+    sortOrder: 6,
+    items: [
+      {
+        id: 'bioswale',
+        nameHe: 'Bioswale — ניהול נגר',
+        description: 'רצועות SUDs לאורך ציר ראשי. עומק 20 ס"מ, רוחב 80 ס"מ.',
+        image: undefined,
+        legend: [
+          { color: '#4A90D9', label: 'רצועת ביוסוואל — ניקוז' },
+          { color: '#7AB8E8', label: 'אזור חדירת מים' },
+        ],
+        status: 'complete',
+        specRef: 'עמ\' 19',
+      },
+    ],
+  },
+  {
+    id: 'accessibility',
+    nameHe: 'נגישות',
+    status: 'pending',
+    layerColor: '#E8734A',
+    sortOrder: 7,
+    items: [
+      {
+        id: 'accessibility-main',
+        nameHe: 'מפרט נגישות — תקן 1918',
+        description: '',
+        image: undefined,
+        legend: [],
+        status: 'pending',
+        note: 'תקן 1918 לא מוזכר במסמך — פרק חסר',
+        specRef: 'חסר',
+      },
+    ],
+  },
+];
