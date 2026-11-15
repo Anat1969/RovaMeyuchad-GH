@@ -1,0 +1,171 @@
+import { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { Html, Line } from '@react-three/drei';
+import * as THREE from 'three';
+import { QUARTER } from '../../data/quarterData';
+import type { QuarterLot } from '../../types/plan';
+import { usePlanStore } from '../../store/planStore';
+
+type Ring = [number, number][];
+
+const PODIUM_H = 6; // גובה קומת המסחר, עד 6 מ' (הוראות טבלה 5)
+const TOWER_COVERAGE = 35; // הנחה: תכסית המגדל במגרש מעורב כמו במגרש מגורים
+
+function centroid(ring: Ring): [number, number] {
+  let a = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [x0, y0] = ring[i];
+    const [x1, y1] = ring[i + 1];
+    const f = x0 * y1 - x1 * y0;
+    a += f;
+    cx += (x0 + x1) * f;
+    cy += (y0 + y1) * f;
+  }
+  return [cx / (3 * a), cy / (3 * a)];
+}
+
+/** מקטין את המגרש סביב מרכזו, כך שהשטח שווה לאחוז התכסית */
+function footprint(ring: Ring, c: [number, number], coveragePct: number): Ring {
+  const k = Math.sqrt(coveragePct / 100);
+  return ring.map(([x, y]) => [c[0] + (x - c[0]) * k, c[1] + (y - c[1]) * k]);
+}
+
+function shapeOf(ring: Ring) {
+  return new THREE.Shape(ring.map(([x, y]) => new THREE.Vector2(x, y)));
+}
+
+/** משטח או מסה. הצורה ב-x,y (מזרח, צפון) מסובבת כך שהצפון פונה אל ‎-Z והגובה אל Y */
+function Solid({
+  ring,
+  base,
+  height,
+  color,
+  opacity,
+  onClick,
+}: {
+  ring: Ring;
+  base: number;
+  height: number;
+  color: string;
+  opacity: number;
+  onClick?: () => void;
+}) {
+  const geo = useMemo(() => {
+    const g =
+      height > 0
+        ? new THREE.ExtrudeGeometry(shapeOf(ring), { depth: height, bevelEnabled: false })
+        : new THREE.ShapeGeometry(shapeOf(ring));
+    g.rotateX(-Math.PI / 2);
+    return g;
+  }, [ring, height]);
+  const mat = useRef<THREE.MeshStandardMaterial>(null);
+  const target = useMemo(() => new THREE.Color(), []);
+  target.set(color);
+
+  useFrame((_, dt) => {
+    const m = mat.current;
+    if (!m) return;
+    const k = Math.min(1, dt * 7);
+    m.color.lerp(target, k);
+    m.opacity += (opacity - m.opacity) * k;
+    m.depthWrite = m.opacity > 0.85;
+  });
+
+  return (
+    <mesh
+      geometry={geo}
+      position={[0, base, 0]}
+      onClick={
+        onClick
+          ? (e) => {
+              e.stopPropagation();
+              onClick();
+            }
+          : undefined
+      }
+      onPointerOver={onClick ? () => (document.body.style.cursor = 'pointer') : undefined}
+      onPointerOut={onClick ? () => (document.body.style.cursor = '') : undefined}
+    >
+      <meshStandardMaterial ref={mat} transparent roughness={0.9} color={color} opacity={opacity} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
+const flat = (ring: Ring, y: number): [number, number, number][] => ring.map(([x, n]) => [x, y, -n]);
+
+function Lot({ lot }: { lot: QuarterLot }) {
+  const topics = usePlanStore((s) => s.topics);
+  const selectedLot = usePlanStore((s) => s.selectedLot);
+  const focus = usePlanStore((s) => s.legendFocus);
+  const selectLot = usePlanStore((s) => s.selectLot);
+
+  // הצבעים נלקחים מהמקרא של נושא הבינוי, כמו בכל שאר המודל
+  const legend = topics.find((t) => t.id === 'massing')?.items[0]?.legend ?? [];
+  const cRes = legend[0]?.color ?? '#E9B77E';
+  const cMixed = legend[1]?.color ?? '#D98A3D';
+  const cPodium = legend[2]?.color ?? '#8E8A93';
+
+  const c = useMemo(() => centroid(lot.ring), [lot]);
+  const tower = useMemo(() => footprint(lot.ring, c, lot.mixed ? TOWER_COVERAGE : lot.coverage), [lot, c]);
+  const podium = useMemo(() => (lot.mixed ? footprint(lot.ring, c, lot.coverage) : null), [lot, c]);
+
+  const isSel = selectedLot === lot.num;
+  const fade = (idx: number) => {
+    if (selectedLot) return isSel ? 1 : 0.22;
+    if (focus) return focus.idx === idx ? 1 : 0.12;
+    return 1;
+  };
+  const useIdx = lot.mixed ? 1 : 0;
+  const pick = () => selectLot(isSel ? null : lot.num);
+
+  return (
+    <group>
+      <Solid ring={lot.ring} base={0.05} height={0} color={lot.mixed ? cMixed : cRes} opacity={0.35 * fade(useIdx) + 0.1} onClick={pick} />
+      <Line points={flat(lot.ring, 0.2)} color={isSel ? '#2E2E2B' : '#B9895A'} lineWidth={isSel ? 3 : 1} />
+      {podium && <Solid ring={podium} base={0.1} height={PODIUM_H} color={cPodium} opacity={fade(2)} onClick={pick} />}
+      <Solid
+        ring={tower}
+        base={podium ? PODIUM_H + 0.1 : 0.1}
+        height={lot.height - (podium ? PODIUM_H : 0)}
+        color={lot.mixed ? cMixed : cRes}
+        opacity={fade(useIdx)}
+        onClick={pick}
+      />
+      <Html position={[c[0], lot.height + 6, -c[1]]} center zIndexRange={[5, 0]} style={{ pointerEvents: 'none' }}>
+        <span
+          className={`whitespace-nowrap px-1 text-[0.7rem] ${
+            isSel ? 'bg-ink font-semibold text-white' : selectedLot ? 'text-ink/30' : 'bg-white/70 text-ink/80'
+          }`}
+        >
+          {lot.num}
+        </span>
+      </Html>
+    </group>
+  );
+}
+
+/** הרובע המיוחד: המגרשים מקובצי התכנית, ומסות סכמטיות לפי טבלת הזכויות */
+export default function QuarterModel() {
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.2, 0]}>
+        <planeGeometry args={[1700, 900]} />
+        <meshStandardMaterial color="#EFE9E1" roughness={1} />
+      </mesh>
+      {QUARTER.lots.map((lot) => (
+        <Lot key={lot.num} lot={lot} />
+      ))}
+      {QUARTER.easements.map((ring, i) => (
+        <Solid key={`e${i}`} ring={ring} base={0.3} height={0} color="#7FB36A" opacity={0.9} />
+      ))}
+      {QUARTER.buildingLines.map((ring, i) => (
+        <Line key={`b${i}`} points={flat(ring, 0.4)} color="#C0392B" lineWidth={1} dashed dashSize={3} gapSize={2} />
+      ))}
+      {QUARTER.commercialFronts.map((ring, i) => (
+        <Line key={`f${i}`} points={flat(ring, 0.6)} color="#6B5B95" lineWidth={4} />
+      ))}
+    </group>
+  );
+}

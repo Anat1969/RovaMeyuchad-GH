@@ -14,6 +14,7 @@ interface PlanState {
   selectedItemId: string | null;
   isEditMode: boolean;
   legendFocus: LegendFocus | null;
+  selectedLot: string | null;
   view: { name: CameraView; tick: number };
   savedAt: number;
 
@@ -25,6 +26,7 @@ interface PlanState {
   addTopic: (nameHe: string) => void;
   resetData: () => void;
   setLegendFocus: (f: LegendFocus | null) => void;
+  selectLot: (num: string | null) => void;
   setView: (name: CameraView) => void;
 }
 
@@ -45,6 +47,7 @@ export const usePlanStore = create<PlanState>()(
       selectedItemId: null,
       isEditMode: false,
       legendFocus: null,
+      selectedLot: null,
       view: { name: 'perspective', tick: 0 },
       savedAt: 0,
 
@@ -55,6 +58,7 @@ export const usePlanStore = create<PlanState>()(
             selectedTopicId: topic?.id ?? null,
             selectedItemId: topic ? (itemId ?? topic.items[0]?.id ?? null) : null,
             legendFocus: null,
+            selectedLot: topic?.id === 'massing' ? s.selectedLot : null,
           };
         }),
       selectItem: (id) => set({ selectedItemId: id, legendFocus: null }),
@@ -112,12 +116,25 @@ export const usePlanStore = create<PlanState>()(
         }),
 
       resetData: () =>
-        set({ topics: clone(PLAN_TOPICS), selectedTopicId: null, selectedItemId: null, savedAt: Date.now() }),
+        set({
+          topics: clone(PLAN_TOPICS),
+          selectedTopicId: null,
+          selectedItemId: null,
+          selectedLot: null,
+          savedAt: Date.now(),
+        }),
       setLegendFocus: (f) => set({ legendFocus: f }),
+      // בחירת מגרש פותחת את נושא הבינוי, כדי שהכרטיס שלו יוצג
+      selectLot: (num) =>
+        set((s) =>
+          num
+            ? { selectedLot: num, selectedTopicId: 'massing', selectedItemId: 'massing-main', legendFocus: null }
+            : { selectedLot: null, selectedTopicId: s.selectedTopicId },
+        ),
       setView: (name) => set((s) => ({ view: { name, tick: s.view.tick + 1 } })),
     }),
     {
-      name: 'rova3d-plan-v1',
+      name: 'rova3d-plan-v2',
       partialize: (s) => ({ topics: s.topics }),
     },
   ),
@@ -137,3 +154,8 @@ export function useSelection() {
 export function completionStats(topics: PlanTopic[]) {
   return { total: topics.length, complete: topics.filter((t) => t.status === 'complete').length };
 }
+
+/** איזה מודל מוצג: הרובע כולו (מקובצי התכנית), או חתך רחוב טיפוסי לנושאי הפיתוח */
+export type SceneName = 'quarter' | 'street';
+export const sceneFor = (topicId: string | null): SceneName =>
+  !topicId || topicId === 'massing' ? 'quarter' : 'street';

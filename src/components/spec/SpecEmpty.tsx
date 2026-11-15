@@ -56,7 +56,7 @@ export default function SpecEmpty() {
         </section>
       )}
 
-      <p className="mt-6 text-sm text-ink/60">בחרי נושא מהסרגל, או לחצי על חלק במודל, להצגת המפרט.</p>
+      <p className="mt-6 text-sm text-ink/60">בחרי נושא מהסרגל, או לחצי על מגרש במודל, להצגת הזכויות והמפרט.</p>
     </div>
   );
 }

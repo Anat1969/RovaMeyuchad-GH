@@ -5,6 +5,8 @@ import SpecHeader from './SpecHeader';
 import SpecLegend from './SpecLegend';
 import SpecPending from './SpecPending';
 import SpecEditForm from './SpecEditForm';
+import SpecStatutory from './SpecStatutory';
+import QuarterPanel from './QuarterPanel';
 
 export default function SpecPanel() {
   const { topic, item } = useSelection();
@@ -43,7 +45,7 @@ export default function SpecPanel() {
             </button>
           </div>
 
-          {(topic.items.length > 1 || isEditMode) && (
+          {topic.id !== 'massing' && (topic.items.length > 1 || isEditMode) && (
             <div className="mb-4 flex flex-wrap gap-1" role="tablist" aria-label="פריטים בנושא">
               {topic.items.map((i) => (
                 <button
@@ -69,15 +71,21 @@ export default function SpecPanel() {
             className="flash-once"
             style={{ ['--flash' as string]: `${topic.layerColor ?? '#F4E9A8'}55` }}
           >
-            {isEditMode ? (
+            {topic.id === 'massing' ? (
+              <QuarterPanel topic={topic} item={item} />
+            ) : isEditMode ? (
               <SpecEditForm key={item.id} topic={topic} item={item} />
             ) : item.status === 'pending' ? (
-              <SpecPending item={item} topic={topic} />
+              <>
+                <SpecPending item={item} topic={topic} />
+                <SpecStatutory topic={topic} />
+              </>
             ) : (
               <>
                 <SpecHeader item={item} topic={topic} />
                 <SpecLegend item={item} />
                 {item.note && <p className="mt-4 bg-ink/[0.04] p-3 text-xs text-ink/70">{item.note}</p>}
+                <SpecStatutory topic={topic} />
               </>
             )}
           </div>
