@@ -134,7 +134,7 @@ export const usePlanStore = create<PlanState>()(
       setView: (name) => set((s) => ({ view: { name, tick: s.view.tick + 1 } })),
     }),
     {
-      name: 'rova3d-plan-v2',
+      name: 'rova3d-plan-v3',
       partialize: (s) => ({ topics: s.topics }),
     },
   ),

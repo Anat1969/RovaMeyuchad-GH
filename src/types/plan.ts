@@ -5,6 +5,8 @@ export interface LegendEntry {
   label: string; // שם בעברית
   latinName?: string; // לצמחים: שם לטיני
   code?: string; // מק"ט / קטלוג
+  image?: string; // תמונה של המין או החומר
+  credit?: string; // צלם ורישיון
 }
 
 export interface SpecItem {
@@ -12,6 +14,7 @@ export interface SpecItem {
   nameHe: string;
   description?: string;
   image?: string; // כתובת או data-url. בלי תמונה: גרפיקה מצבעי המקרא
+  imageCredit?: string; // צלם ורישיון
   legend: LegendEntry[];
   status: ItemStatus;
   note?: string; // הערה / "להשלמה"

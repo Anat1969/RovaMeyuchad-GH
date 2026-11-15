@@ -31,7 +31,7 @@ export default function SpecPanel() {
   return (
     <aside
       aria-label="מפרט"
-      className="min-h-0 flex-1 overflow-y-auto bg-white p-4 shadow-[-1px_0_0_#E7E2DA_inset] md:h-full md:w-[clamp(20rem,25vw,29rem)] md:flex-none md:p-6"
+      className="min-h-0 flex-1 overflow-y-auto bg-white p-4 shadow-[-1px_0_0_#E7E2DA_inset] md:h-full md:flex-1 md:p-6"
     >
       {!topic || !item ? (
         <SpecEmpty />

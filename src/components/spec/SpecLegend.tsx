@@ -11,7 +11,7 @@ export default function SpecLegend({ item }: { item: SpecItem }) {
   return (
     <section className="mt-5">
       <h3 className="mb-1 text-xs font-semibold text-ink/60">מקרא</h3>
-      <p className="mb-2 text-xs text-ink/45">מעבר על שורה מבודד את החומר במודל</p>
+      <p className="mb-2 text-xs text-ink/45">מעבר על שורה מבודד את החומר במודל, ומציג את התמונה שלו למעלה</p>
       <ul onMouseLeave={() => setFocus(null)}>
         {item.legend.map((entry, idx) => {
           const on = focus?.itemId === item.id && focus.idx === idx;
@@ -24,6 +24,7 @@ export default function SpecLegend({ item }: { item: SpecItem }) {
                 onClick={() => setFocus(on ? null : { itemId: item.id, idx })}
               >
                 <ColorSwatch color={entry.color} />
+                {entry.image && <img src={entry.image} alt="" className="h-10 w-14 shrink-0 object-cover" loading="lazy" />}
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm">{entry.label}</span>
                   {entry.latinName && entry.latinName !== entry.label && (

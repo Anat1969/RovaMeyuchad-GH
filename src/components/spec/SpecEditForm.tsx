@@ -49,7 +49,7 @@ export default function SpecEditForm({ topic, item }: { topic: PlanTopic; item: 
       return;
     }
     try {
-      patch({ image: await shrinkImage(file) });
+      patch({ image: await shrinkImage(file), imageCredit: undefined });
       setError('');
     } catch {
       setError('לא הצלחתי לקרוא את התמונה. נסי קובץ אחר.');
@@ -68,7 +68,7 @@ export default function SpecEditForm({ topic, item }: { topic: PlanTopic; item: 
       const el = document.activeElement;
       const typing = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
       const text = e.clipboardData?.getData('text').trim() ?? '';
-      if (!typing && /^https?:\/\/\S+$/.test(text)) patch({ image: text });
+      if (!typing && /^https?:\/\/\S+$/.test(text)) patch({ image: text, imageCredit: undefined });
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
@@ -103,7 +103,7 @@ export default function SpecEditForm({ topic, item }: { topic: PlanTopic; item: 
             {item.image ? 'החלפת תמונה' : 'העלאת תמונה'}
           </button>
           {item.image && (
-            <button type="button" className="btn text-xs" onClick={() => patch({ image: undefined })}>
+            <button type="button" className="btn text-xs" onClick={() => patch({ image: undefined, imageCredit: undefined })}>
               הסרה
             </button>
           )}
@@ -253,7 +253,13 @@ export default function SpecEditForm({ topic, item }: { topic: PlanTopic; item: 
           type="button"
           className="btn flex-1"
           onClick={() => {
-            patch({ ...snapshot, image: snapshot.image, note: snapshot.note, specRef: snapshot.specRef });
+            patch({
+              ...snapshot,
+              image: snapshot.image,
+              imageCredit: snapshot.imageCredit,
+              note: snapshot.note,
+              specRef: snapshot.specRef,
+            });
             toggleEditMode(false);
           }}
         >
