@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { METRICS, METRIC_CHAPTERS, STATE_HINT, STATE_LABEL, type MetricState } from '../../data/metrics';
 import { usePlanStore } from '../../store/planStore';
 import PanelShell from './PanelShell';
-import { IconBtn } from '../ui/Icon';
+import ShowBtn from '../ui/ShowBtn';
+import Check from '../ui/Check';
+import { MISSING_GIS } from '../../data/sources';
 import { OFFICIAL, OFFICIAL_DATE, OFFICIAL_SUMMARY, OFFICIAL_URL } from '../../data/official360';
 
 const ORDER: MetricState[] = ['fit', 'adjust', 'add', 'out'];
@@ -16,7 +18,11 @@ const CHIP: Record<MetricState, string> = {
 
 /** דוח בדיקה מול 44 מדדי שכונה 360°: מה יש, מה להתאים, מה להוסיף, והנחיה לאדריכל בכל מדד */
 export default function MetricsPanel() {
-  const go = usePlanStore((s) => s.go);
+  const checks = usePlanStore((s) => s.checks);
+  const setCheck = usePlanStore((s) => s.setCheck);
+  // הניקוד המחושב: מדד שמתאים לפי הבדיקה, או שסומן ידנית כקיים
+  const auto = METRICS.filter((m) => m.state === 'fit').reduce((a, m) => a + m.max, 0);
+  const manual = METRICS.filter((m) => m.state !== 'fit' && checks[`m-${m.id}`]?.done).reduce((a, m) => a + m.max, 0);
   const [filter, setFilter] = useState<MetricState | 'all'>('all');
   const n = (s: MetricState) => METRICS.filter((m) => m.state === s).length;
   const points = (s: MetricState) => METRICS.filter((m) => m.state === s).reduce((a, m) => a + m.max, 0);
@@ -53,6 +59,29 @@ export default function MetricsPanel() {
           המדידה: {OFFICIAL_DATE}, אוטומטית, שלב ב', מול הוראות תכנית 603-0811588 בלבד. המצגת של צוות התכנון ותכנית 3/124/03/3 לא נכללו בה. לכן הבדיקה שלמטה רחבה
           יותר: היא מוסיפה את מה שהמצגת כבר נותנת.
         </p>
+      </section>
+
+      <section className="mt-4 bg-ink/[0.04] p-3">
+        <h3 className="text-sm font-semibold">הניקוד המחושב כאן</h3>
+        <p className="mt-1 text-3xl font-light leading-none">
+          {auto + manual} <span className="text-base text-ink/55">מתוך 120 נקודות</span>
+        </p>
+        <p className="mt-1 text-sm text-ink/70">
+          <span className="font-semibold">{auto}</span> ממדדים שנמצאו מתאימים בבדיקה, ועוד <span className="font-semibold">{manual}</span> ממדדים שסימנת כקיימים. הסף לדרגת ארד: 55.
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-ink/50">מדד שסומן מקבל את מלוא הניקוד שלו. זו הערכה לעבודה, ולא ניקוד רשמי. ליד כל סימון ידני כותבים הסבר.</p>
+        <details className="no-print mt-2 text-sm">
+          <summary className="cursor-pointer font-semibold" title="מה חסר כדי למדוד אוטומטית">
+            {MISSING_GIS.length} שכבות GIS שחסרות למדידה אוטומטית
+          </summary>
+          <ol className="mt-2 list-decimal space-y-1 pr-5 leading-relaxed">
+            {MISSING_GIS.map((g) => (
+              <li key={g.layer}>
+                <span className="font-semibold">{g.layer}.</span> {g.enables}
+              </li>
+            ))}
+          </ol>
+        </details>
       </section>
 
       <h3 className="mt-5 text-sm font-semibold">הבדיקה המורחבת: התוכנית והמצגת יחד</h3>
@@ -106,14 +135,20 @@ export default function MetricsPanel() {
                       <h4 className="text-base font-semibold leading-snug">{m.name}</h4>
                       <span className={`px-1.5 text-xs font-semibold ${CHIP[m.state]}`}>{STATE_LABEL[m.state]}</span>
                       <span className="text-xs text-ink/45">{m.max} נק'</span>
+                      {m.state !== 'fit' && <Check id={`m-${m.id}`} label="קיים בתוכנית" />}
                     </div>
                     <p className="mt-1 text-sm leading-relaxed text-ink/70">
                       <span className="font-semibold text-ink/80">מה יש: </span>
                       {m.has}
                     </p>
                     <p className="mt-1 text-base leading-relaxed">
-                      <span className="bg-[#F4E9A8] px-1 font-semibold">הנחיה לאדריכל</span> {m.todo}
+                      <span className="font-semibold">הנחיה לאדריכל: </span>
+              <span className="bg-[#F4E9A8] px-1">{m.todo}</span>
                     </p>
+                    <p className="text-xs text-ink/45">מקור הדרישה: שכונה 360°, גרסה 2.0, מדד {m.id}.</p>
+                    {checks[`m-${m.id}`]?.done && (
+                      <input className="field no-print mt-1 py-1.5" placeholder="הסבר: איפה זה מופיע בתוכנית" aria-label="הסבר לסימון" value={checks[`m-${m.id}`]?.note ?? ''} onChange={(e) => setCheck(`m-${m.id}`, { note: e.target.value })} />
+                    )}
                     <p className="mt-1 text-sm leading-relaxed text-ink/70">
                       <span className="font-semibold text-ink/80">ניקוד רשמי: </span>
                       {OFFICIAL[m.id].s == null ? 'לא ניתן למדוד. ' : `${OFFICIAL[m.id].s} מתוך ${m.max}. `}
@@ -124,7 +159,7 @@ export default function MetricsPanel() {
                         ראיה: "{OFFICIAL[m.id].q}" ({OFFICIAL[m.id].src})
                       </p>
                     )}
-                    {m.go && <IconBtn icon="show" label="הצגה במודל" className="no-print mt-2" onClick={() => go(m.go!)} />}
+                    {m.go && <ShowBtn go={m.go!} />}
                   </div>
                 </li>
               ))}

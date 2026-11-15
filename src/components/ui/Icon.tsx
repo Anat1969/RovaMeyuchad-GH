@@ -87,6 +87,8 @@ const P: Record<string, ReactNode> = {
   home: <path d="M3 11 12 3l9 8M5 10v11h14V10M10 21v-6h4v6" />,
   external: <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />,
   section: <path d="M2 19h20M4 19V8h3v11M17 19V5h3v14M12 19v-5M12 14a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />,
+  bookmark: <path d="M6 3h12v18l-6-5-6 5V3Z" />,
+  library: <path d="M4 4h4v16H4V4Zm6 0h4v16h-4V4Zm6.5 1.5 3.5-1 3 14-3.5 1-3-14Z" transform="scale(.9)" />,
   prev: <path d="m9 5 7 7-7 7" />,
   next: <path d="m15 5-7 7 7 7" />,
 };

@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { PANELS, TONE_LABEL, type InsightBlock, type InsightItem, type PanelId, type Tone } from '../../data/insights';
-import { usePlanStore } from '../../store/planStore';
 import PanelShell from './PanelShell';
-import { IconBtn } from '../ui/Icon';
+import ShowBtn from '../ui/ShowBtn';
 
 const TONE_CLS: Record<Tone, string> = {
   ok: 'bg-done/10 text-done',
@@ -17,7 +16,6 @@ const TONE_CLS: Record<Tone, string> = {
 
 /** שורה בלוח: מספר גדול, הטענה, ההסבר, ההנחיה לאדריכל, וקישור למודל */
 export function ItemRow({ it, n }: { it: InsightItem; n: number }) {
-  const go = usePlanStore((s) => s.go);
   const tone = it.tone ?? 'plain';
   return (
     <li className="grid grid-cols-[2.2rem_1fr] gap-x-2 bg-ink/[0.03] p-3">
@@ -30,12 +28,13 @@ export function ItemRow({ it, n }: { it: InsightItem; n: number }) {
         {it.d && <p className="mt-1 text-sm leading-relaxed text-ink/75">{it.d}</p>}
         {it.ask && (
           <p className="mt-1 text-base leading-relaxed">
-            <span className="bg-[#F4E9A8] px-1 font-semibold">הנחיה לאדריכל</span> {it.ask}
+            <span className="font-semibold">הנחיה לאדריכל: </span>
+              <span className="bg-[#F4E9A8] px-1">{it.ask}</span>
           </p>
         )}
         {it.ref && <p className="mt-1 text-xs text-ink/45">מקור: {it.ref}</p>}
         {it.go && (
-<IconBtn icon="show" label="הצגה במודל" className="no-print mt-2" onClick={() => go(it.go!)} />
+<ShowBtn go={it.go!} />
         )}
       </div>
     </li>
@@ -98,6 +97,12 @@ export default function InsightPanelView({ id }: { id: PanelId }) {
         <Block key={b.h} b={b} hidden={!!p.tabs && tab !== i} />
       ))}
       <p className="mt-5 text-xs leading-relaxed text-ink/50">{p.source}</p>
+      {id === 'people' && (
+        <p className="mt-5 text-xs leading-relaxed text-ink/55">
+          מקור ההנחיות: תדריך תכנון לעת זקנה (הבסיס לאפליקציית MUNI100), ו-12 העקרונות של Urban95 לתכנון עיר לגיל הרך (הבסיס לאפליקציית URBAN95). מקור הממצאים: מצגת שפת רחוב ושצ"פ של צוות
+          התכנון. ליד כל שורה רשום העמוד.
+        </p>
+      )}
     </PanelShell>
   );
 }

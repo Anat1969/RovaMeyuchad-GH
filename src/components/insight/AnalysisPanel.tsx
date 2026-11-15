@@ -15,11 +15,14 @@ import {
   type Analysis,
   type Season,
   designShift,
+  effWind,
+  windName,
   setSurface,
 } from '../../analysis/engine';
 import { RULES } from '../../data/rules';
 import { usePlanStore } from '../../store/planStore';
 import PanelShell from './PanelShell';
+import ShowBtn from '../ui/ShowBtn';
 import { IconBtn } from '../ui/Icon';
 import type { Go } from '../../data/insights';
 
@@ -61,7 +64,7 @@ function useFindings(a: Analysis, season: Season, windFrom: number, design: bool
       const f = windField(windFrom);
       const fast = alongStreets(f, (v) => v > 0.7);
       const calm = alongStreets(f, (v) => v < 0.35);
-      const dir = WIND_DIRS.find((w) => w.deg === windFrom)!.name;
+      const dir = windName(windFrom);
       return {
         title: `${pct(fast.all)} מהמדרכות באזור האצת רוח, ${pct(calm.all)} בצל רוח`,
         lead: `רוח מ${dir}. מגדלים של עד 100 מ' מאיצים את הרוח בפינות ובמעברים שביניהם, ויוצרים מאחוריהם אזור רגוע.`,
@@ -123,20 +126,22 @@ export default function AnalysisPanel({ a }: { a: Analysis }) {
   const set = usePlanStore((s) => s.setAnalysisParams);
   const setAnalysis = usePlanStore((s) => s.setAnalysis);
   const setView = usePlanStore((s) => s.setView);
-  const go = usePlanStore((s) => s.go);
   const playing = usePlanStore((s) => s.sunPlaying);
   const setPlaying = usePlanStore((s) => s.setSunPlaying);
-  const f = useFindings(a, p.season, p.windFrom, p.design);
+  const wind = effWind(p);
+  const f = useFindings(a, p.season, a === 'wind' ? wind.from : p.windFrom, p.design);
 
   // תנועת השמש: שעה אחרי שעה
   useEffect(() => {
-    if (a !== 'shade' || !playing || p.day) return;
+    const sun = a === 'shade' && !p.day;
+    const breeze = a === 'wind' && p.windDay;
+    if ((!sun && !breeze) || !playing) return;
     const t = window.setInterval(() => {
       const h = usePlanStore.getState().analysisParams.hour;
-      usePlanStore.getState().setAnalysisParams({ hour: h >= 17 ? 7 : h + 0.25 });
+      usePlanStore.getState().setAnalysisParams({ hour: breeze ? (h >= 23.75 ? 0 : h + 0.25) : h >= 17 ? 7 : h + 0.25 });
     }, 220);
     return () => window.clearInterval(t);
-  }, [a, playing, p.day]);
+  }, [a, playing, p.day, p.windDay]);
 
   const max = Math.max(0.01, ...f.bars.list.map((s) => s.v));
   const seasonBtns = (
@@ -200,6 +205,35 @@ export default function AnalysisPanel({ a }: { a: Analysis }) {
           </div>
         )}
         {a === 'wind' && (
+          <>
+            {seasonBtns}
+            <div className="grid grid-cols-2 gap-1">
+              <button title="הרוח משתנה לאורך היום" aria-pressed={p.windDay} onClick={() => set({ windDay: true })} className={`btn py-1.5 text-xs ${p.windDay ? 'btn-on' : ''}`}>
+                מחזור יומי
+              </button>
+              <button title="בוחרים כיוון אחד" aria-pressed={!p.windDay} onClick={() => set({ windDay: false })} className={`btn py-1.5 text-xs ${!p.windDay ? 'btn-on' : ''}`}>
+                כיוון קבוע
+              </button>
+            </div>
+            {p.windDay && (
+              <>
+                <div className="flex items-center gap-2">
+                  <button title={playing ? 'עצירת השעון' : 'הפעלת השעון'} className="btn w-16 py-1 text-xs" onClick={() => setPlaying(!playing)}>
+                    {playing ? 'עצירה' : 'הפעלה'}
+                  </button>
+                  <input type="range" min={0} max={23.75} step={0.25} value={p.hour} aria-label="שעה" title="שעת היום" className="flex-1 accent-[#2E2E2B]" onChange={(e) => (setPlaying(false), set({ hour: Number(e.target.value) }))} />
+                  <span className="w-12 text-left text-sm font-semibold" dir="ltr">
+                    {Math.floor(p.hour)}:{String(Math.round((p.hour % 1) * 60)).padStart(2, '0')}
+                  </span>
+                </div>
+                <p className="text-sm">
+                  עכשיו: רוח <span className="font-semibold">מ{windName(wind.from)}</span>, בעוצמה של <span className="font-semibold">{Math.round(wind.strength * 100)}%</span> מהשיא.
+                </p>
+              </>
+            )}
+          </>
+        )}
+        {a === 'wind' && !p.windDay && (
           <div className="grid grid-cols-4 gap-1">
             {WIND_DIRS.map((w) => (
               <button key={w.deg} title="הכיוון שממנו הרוח נושבת" aria-pressed={p.windFrom === w.deg} onClick={() => set({ windFrom: w.deg })} className={`btn px-1 py-1.5 text-xs ${p.windFrom === w.deg ? 'btn-on' : ''}`}>
@@ -228,10 +262,11 @@ export default function AnalysisPanel({ a }: { a: Analysis }) {
               <span className="text-3xl font-light leading-none text-ink/35">{i + 1}</span>
               <div>
                 <p className="text-base leading-snug">
-                  <span className="bg-[#F4E9A8] px-1 font-semibold">הנחיה לאדריכל</span> {t.t}
+                  <span className="font-semibold">הנחיה לאדריכל: </span>
+              <span className="bg-[#F4E9A8] px-1">{t.t}</span>
                 </p>
                 <p className="mt-1 text-sm leading-relaxed text-ink/75">{t.d}</p>
-                {t.go && <IconBtn icon="show" label="הצגת הנושא במודל" className="no-print mt-2" onClick={() => go(t.go!)} />}
+                {t.go && <ShowBtn go={t.go!} />}
               </div>
             </li>
           ))}
@@ -256,7 +291,7 @@ export default function AnalysisPanel({ a }: { a: Analysis }) {
 
       <p className="mt-5 text-xs leading-relaxed text-ink/50">
         זהו מודל מפושט להמחשה ולכיוון תכנוני, ולא סימולציה הנדסית. הבניינים הם מעטפות הזכויות, ולא התכנון הסופי. העצים ממוקמים לפי כללי האוגדן, ולא לפי תוכנית נטיעות.
-        {a === 'wind' && ' הרוח אינה חישוב זרימה: היא מסמנת אזור מוגן מאחורי כל בניין, ואזור האצה סביב מגדלים.'}
+        {a === 'wind' && ' המחזור היומי הוא דפוס אופייני למישור החוף (בריזת ים ובריזת יבשה), ולא מדידה של תחנה. צבע הקווים ואורכם מראים את המהירות: כחול לחלשה, אדום לחזקה. הרוח אינה חישוב זרימה: היא מסמנת אזור מוגן מאחורי כל בניין, ואזור האצה סביב מגדלים.'}
         {a === 'water' && ' הקרקע הקיימת: SRTM, רזולוציה של כ-30 מ\'. מפלסי התכנון: 28 נקודות לאורך הרחובות בלבד, שנקראו בעין מנספח הניקוז. בין הרחובות ובתוך המגרשים המשטח הוא אינטרפולציה.'}
         {a === 'heat' && ' המדד אינו טמפרטורה.'}
       </p>

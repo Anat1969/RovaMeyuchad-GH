@@ -5,7 +5,7 @@ import { drapedPlane, tY } from '../../analysis/terrain';
 import { DESIGN_LEVELS } from '../../data/designLevels';
 import { Html } from '@react-three/drei';
 import { usePlanStore } from '../../store/planStore';
-import { H, W, X0, Y1, buildingMask, downhill, flowAt, ground, mapCanvas, setSurface, windField, windTo } from '../../analysis/engine';
+import { H, W, X0, Y1, buildingMask, downhill, effWind, flowAt, ground, mapCanvas, setSurface, windField, windTo } from '../../analysis/engine';
 
 const PW = Math.round(W);
 const PH = Math.round(H);
@@ -23,7 +23,7 @@ function MapPlane() {
     return t;
     // במפת יום מלא השעה אינה משנה את התמונה
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a, p.season, p.windFrom, p.day, p.design, a === 'shade' && !p.day ? p.hour : 0]);
+  }, [a, p.season, p.windFrom, p.day, p.design, p.windDay, a === 'shade' && !p.day ? p.hour : a === 'wind' ? effWind(p).from : 0]);
   useEffect(() => () => tex.dispose(), [tex]);
   return (
     <mesh geometry={PLANE} renderOrder={3}>
@@ -33,12 +33,21 @@ function MapPlane() {
 }
 
 const N = 1400;
+/** סולם המהירות של הרוח: כחול, ירוק, צהוב, אדום */
+export const SPEED_RAMP: [number, number, number][] = [[0.17, 0.42, 0.69], [0.25, 0.65, 0.45], [0.93, 0.78, 0.2], [0.82, 0.25, 0.18]];
+function speedColor(t: number): [number, number, number] {
+  const x = t * (SPEED_RAMP.length - 1);
+  const i = Math.min(SPEED_RAMP.length - 2, Math.floor(x));
+  const f = x - i;
+  return [0, 1, 2].map((k) => SPEED_RAMP[i][k] + (SPEED_RAMP[i + 1][k] - SPEED_RAMP[i][k]) * f) as [number, number, number];
+}
 /** חלקיקים בתנועה: רוח שנושבת סביב הבניינים, או נגר שיורד במורד הקרקע */
 function Particles({ kind }: { kind: 'wind' | 'water' }) {
   const windFrom = usePlanStore((s) => s.analysisParams.windFrom);
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 6), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 6).fill(0.2), 3));
     return g;
   }, []);
   const state = useRef({ x: new Float32Array(N), y: new Float32Array(N), life: new Float32Array(N) });
@@ -58,8 +67,10 @@ function Particles({ kind }: { kind: 'wind' | 'water' }) {
     const s = state.current;
     const pos = geo.attributes.position.array as Float32Array;
     const mask = buildingMask();
-    const field = kind === 'wind' ? windField(windFrom) : null;
-    const [wx, wy] = windTo(windFrom);
+    const eff = effWind(usePlanStore.getState().analysisParams);
+    const field = kind === 'wind' ? windField(eff.from) : null;
+    const [wx, wy] = windTo(eff.from);
+    const col = geo.attributes.color.array as Float32Array;
     for (let i = 0; i < N; i++) {
       let vx = 0;
       let vy = 0;
@@ -69,7 +80,14 @@ function Particles({ kind }: { kind: 'wind' | 'water' }) {
       if (kind === 'wind') {
         const f = inside && field ? field[iy * PW + ix] : 0.5;
         // 0.5 היא רוח חופשית. בצל רוח החלקיק כמעט עומד, ובאזור האצה הוא רץ
-        const speed = 95 * f * f * 2.2;
+        const speed = 150 * f * f * 2.2 * eff.strength;
+        // צבע לפי מהירות: כחול לרוח חלשה, ירוק, צהוב, ואדום לרוח חזקה
+        const [r, g2, b2] = speedColor(Math.min(1, speed / 150));
+        for (const o of [0, 3]) {
+          col[i * 6 + o] = r;
+          col[i * 6 + o + 1] = g2;
+          col[i * 6 + o + 2] = b2;
+        }
         vx = wx * speed;
         vy = wy * speed;
       } else {
@@ -92,7 +110,7 @@ function Particles({ kind }: { kind: 'wind' | 'water' }) {
       s.x[i] = nx;
       s.y[i] = ny;
       const h = kind === 'wind' ? 4 : 1.6;
-      const tail = kind === 'wind' ? 0.22 : 0.5;
+      const tail = kind === 'wind' ? 0.3 : 0.5;
       pos[i * 6] = nx;
       pos[i * 6 + 1] = h + tY(nx, ny);
       pos[i * 6 + 2] = -ny;
@@ -101,11 +119,12 @@ function Particles({ kind }: { kind: 'wind' | 'water' }) {
       pos[i * 6 + 5] = -(ny - vy * tail);
     }
     geo.attributes.position.needsUpdate = true;
+    if (kind === 'wind') geo.attributes.color.needsUpdate = true;
   });
 
   return (
     <lineSegments geometry={geo} frustumCulled={false} renderOrder={4}>
-      <lineBasicMaterial color={kind === 'wind' ? '#1E2A44' : '#0B3C8C'} transparent opacity={0.75} depthWrite={false} />
+      <lineBasicMaterial key={kind} vertexColors={kind === 'wind'} color={kind === 'wind' ? '#FFFFFF' : '#0B3C8C'} transparent opacity={kind === 'wind' ? 0.95 : 0.75} depthWrite={false} />
     </lineSegments>
   );
 }

@@ -47,7 +47,8 @@ export default function PanelShell({
     const short = full.length <= 1500;
     if (!short) await copy();
     const bodyText = short ? full : `${title}\n\n[הטקסט המלא הועתק. יש להדביק אותו כאן: Ctrl+V]`;
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
+    // Gmail בלשונית חדשה: קישור mailto לא נפתח בדפדפן שלא הוגדרה בו תוכנת מייל
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`, '_blank', 'noopener');
     if (!short) flash('הטקסט המלא הועתק. הדביקי אותו בגוף המייל.');
   };
 
@@ -59,7 +60,7 @@ export default function PanelShell({
         </span>
         <IconBtn icon="print" label="הדפסה" onClick={() => window.print()} />
         <IconBtn icon="copy" label="העתקה" onClick={copy} />
-        <IconBtn icon="mail" label="שליחה במייל" onClick={mail} />
+        <IconBtn icon="mail" label="פתיחת הודעה ב-Gmail" onClick={mail} />
         <IconBtn icon="close" label="סגירה" onClick={onClose ?? (() => setPanel(null))} />
         <span className="w-full text-xs text-done" aria-live="polite">
           {msg}

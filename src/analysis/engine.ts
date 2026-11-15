@@ -356,10 +356,38 @@ function fillSinks(h: Float32Array): Float32Array {
   }
   return out;
 }
+/** החלקה של רשת הגובה: ממוצע נע, פעמיים, ברדיוס של 3 תאים */
+function smooth(h: ArrayLike<number>): Float32Array {
+  const { nx, ny } = DEM;
+  let cur = Float32Array.from(h);
+  for (let pass = 0; pass < 2; pass++) {
+    for (const axis of [0, 1]) {
+      const next = new Float32Array(nx * ny);
+      for (let j = 0; j < ny; j++) {
+        for (let i = 0; i < nx; i++) {
+          let s = 0;
+          let c = 0;
+          for (let d = -3; d <= 3; d++) {
+            const a = axis ? i : i + d;
+            const b = axis ? j + d : j;
+            if (a < 0 || b < 0 || a >= nx || b >= ny) continue;
+            s += cur[b * nx + a];
+            c++;
+          }
+          next[j * nx + i] = s / c;
+        }
+      }
+      cur = next;
+    }
+  }
+  return cur;
+}
 /** משטח התכנון: הקרקע הקיימת, מתוקנת לפי 28 מפלסי השוחות. התיקון מלא עד 80 מ' מנקודה, ודועך עד 200 מ' */
 function designSurface() {
   if (designH) return designH;
-  const diffs = DESIGN_LEVELS.map(([x, y, z]) => z - bilinear(DEM.h, x, y));
+  // הקרקע המתוכננת מפולסת: נתוני SRTM מוחלקים ברדיוס של כ-60 מ', כדי שכביש לא יעלה וירד עם הרעש שבנתונים
+  const base = smooth(DEM.h);
+  const diffs = DESIGN_LEVELS.map(([x, y, z]) => z - bilinear(base, x, y));
   const out = new Float32Array(DEM.nx * DEM.ny);
   for (let j = 0; j < DEM.ny; j++) {
     for (let i = 0; i < DEM.nx; i++) {
@@ -376,7 +404,7 @@ function designSurface() {
         dmin = Math.min(dmin, d);
       });
       const fade = Math.max(0, Math.min(1, 1 - (dmin - 80) / 120));
-      out[j * DEM.nx + i] = DEM.h[j * DEM.nx + i] + (fade * sd) / sw;
+      out[j * DEM.nx + i] = base[j * DEM.nx + i] + (fade * sd) / sw;
     }
   }
   designH = fillSinks(out);
@@ -512,17 +540,45 @@ export function heatField(season: Season): Float32Array {
   return out;
 }
 
+/**
+ * מחזור הרוח האופייני במישור החוף הדרומי, לפי עונה ושעה: [שעה, כיוון שממנו הרוח באה, עוצמה יחסית 0 עד 1].
+ * בקיץ: בריזת יבשה חלשה ממזרח בלילה, בריזת ים שמתחילה ממערב בבוקר, מתחזקת וסבה לצפון-מערב אחר הצהריים, ונחלשת בערב.
+ * זהו דפוס אופייני להמחשה, ולא מדידה של תחנה מטאורולוגית.
+ */
+const WIND_CYCLE: Record<Season, [number, number, number][]> = {
+  summer: [[0, 110, 0.2], [6, 110, 0.2], [9, 250, 0.35], [12, 290, 0.6], [15, 315, 0.9], [18, 335, 0.6], [21, 350, 0.3], [24, 470, 0.2]],
+  equinox: [[0, 100, 0.25], [7, 100, 0.25], [10, 260, 0.4], [14, 300, 0.7], [18, 330, 0.45], [22, 420, 0.2], [24, 460, 0.25]],
+  winter: [[0, 90, 0.45], [8, 90, 0.45], [11, 200, 0.4], [14, 250, 0.55], [17, 230, 0.4], [20, 130, 0.35], [24, 90, 0.45]],
+};
+export function windAt(season: Season, hour: number): { from: number; strength: number } {
+  const c = WIND_CYCLE[season];
+  let i = 0;
+  while (i + 2 < c.length && hour >= c[i + 1][0]) i++;
+  const [h0, d0, s0] = c[i];
+  const [h1, d1, s1] = c[i + 1];
+  const t = Math.max(0, Math.min(1, (hour - h0) / (h1 - h0)));
+  return { from: (((d0 + (d1 - d0) * t) % 360) + 360) % 360, strength: s0 + (s1 - s0) * t };
+}
+/** הרוח שמוצגת כרגע: במחזור היומי לפי השעה, ואחרת בכיוון שנבחר. הכיוון מעוגל ל-22.5 מעלות */
+export function effWind(p: Params): { from: number; strength: number } {
+  if (!p.windDay) return { from: p.windFrom, strength: 0.7 };
+  const w = windAt(p.season, p.hour);
+  return { from: (Math.round(w.from / 22.5) * 22.5) % 360, strength: w.strength };
+}
+export const windName = (deg: number) => WIND_DIRS.reduce((b, w) => (Math.abs(((w.deg - deg + 540) % 360) - 180) < Math.abs(((b.deg - deg + 540) % 360) - 180) ? w : b)).name;
+
 // ---------- מפה לתצוגה, ונתונים לאורך הרחובות
 export interface Params {
   season: Season;
   hour: number;
   windFrom: number;
   day: boolean; // הצללות: כל היום, או השעה הנוכחית
+  windDay: boolean; // רוח: מחזור יומי אופייני, או כיוון קבוע
   design: boolean; // ניקוז: על מפלסי התכנון, או על הקרקע הקיימת
 }
 export function field(a: Analysis, p: Params): Float32Array {
   if (a === 'shade') return shadeFraction(p.season);
-  if (a === 'wind') return windField(p.windFrom);
+  if (a === 'wind') return windField(effWind(p).from);
   if (a === 'heat') return heatField(p.season);
   setSurface(p.design);
   return flowRaster();

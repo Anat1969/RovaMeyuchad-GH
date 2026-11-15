@@ -4,7 +4,7 @@ import { Html, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { QUARTER } from '../../data/quarterData';
 import type { QuarterLot } from '../../types/plan';
-import { tY } from '../../analysis/terrain';
+import { drapedLine, drapedShape, tY } from '../../analysis/terrain';
 import { usePlanStore } from '../../store/planStore';
 import { FLOOR, facadeTextures } from './facades';
 import { DESIGNS } from '../../data/designData';
@@ -206,12 +206,16 @@ export default function QuarterModel() {
         <Lot key={lot.num} lot={lot} real={real} />
       ))}
       {!real &&
-        QUARTER.easements.map((ring, i) => <Solid key={`e${i}`} ring={ring} base={0.3} height={0} color="#7FB36A" opacity={0.9} />)}
+        QUARTER.easements.map((ring, i) => (
+          <mesh key={`e${i}`} geometry={drapedShape(ring, 0.3)}>
+            <meshStandardMaterial color="#7FB36A" transparent opacity={0.9} side={THREE.DoubleSide} depthWrite={false} roughness={1} />
+          </mesh>
+        ))}
       {!real &&
         QUARTER.buildingLines.map((ring, i) => (
-          <Line key={`b${i}`} points={flat(ring, 0.4)} color="#C0392B" lineWidth={1} dashed dashSize={3} gapSize={2} />
+          <Line key={`b${i}`} points={drapedLine(ring, 0.5)} color="#C0392B" lineWidth={1} dashed dashSize={3} gapSize={2} />
         ))}
-      {!real && QUARTER.commercialFronts.map((ring, i) => <Line key={`f${i}`} points={flat(ring, 0.6)} color="#6B5B95" lineWidth={4} />)}
+      {!real && QUARTER.commercialFronts.map((ring, i) => <Line key={`f${i}`} points={drapedLine(ring, 0.7)} color="#6B5B95" lineWidth={4} />)}
     </group>
   );
 }

@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { DIFFERENCES, VERDICT, type Verdict } from '../../data/differences';
 import { usePlanStore } from '../../store/planStore';
-import { IconBtn } from '../ui/Icon';
 import Tag from '../ui/Tag';
+import Check from '../ui/Check';
 import PanelShell from './PanelShell';
+import ShowBtn from '../ui/ShowBtn';
 
 /** תב"ע מול תוכנית הבינוי: שני הצדדים זה מול זה, עם המקור של כל אחד */
 export default function DiffPanel() {
-  const go = usePlanStore((s) => s.go);
+  const checks = usePlanStore((s) => s.checks);
   const [f, setF] = useState<Verdict | null>(null);
   const count = (v: Verdict) => DIFFERENCES.filter((d) => d.verdict === v).length;
   const list = DIFFERENCES.filter((d) => !f || d.verdict === f);
@@ -47,9 +48,15 @@ export default function DiffPanel() {
                 <p className="text-xs text-ink/50">מקור: {d.designSrc}.</p>
               </div>
               <p className="mt-2 text-sm leading-relaxed">
-                <span className="bg-[#F4E9A8] px-1 font-semibold">מה לעשות</span> {d.todo}
+                <span className="font-semibold">מה לעשות: </span>
+                <span className="bg-[#F4E9A8] px-1">{d.todo}</span>
               </p>
-              {d.go && <IconBtn icon="show" label="הצגה במודל" className="no-print mt-2" onClick={() => go(d.go!)} />}
+              <div className="no-print mt-2 flex items-center gap-2">
+                <Check id={`diff-${d.topic}`} label="טופל" />
+                <span className="text-xs text-ink/60">{checks[`diff-${d.topic}`]?.done ? 'טופל' : 'סימון כשטופל'}</span>
+                <span className="flex-1" />
+                {d.go && <ShowBtn go={d.go} className="" />}
+              </div>
             </div>
           </li>
         ))}

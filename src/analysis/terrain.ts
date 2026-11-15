@@ -125,10 +125,18 @@ export function drapedShape(ring: Pt[], lift: number) {
   g.rotateX(-Math.PI / 2);
   g = new TessellateModifier(22, 7).modify(g);
   const p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) p.setY(i, tY(p.getX(i), -p.getZ(i)) + lift);
+  const uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) {
+    p.setY(i, tY(p.getX(i), -p.getZ(i)) + lift);
+    uv[i * 2] = p.getX(i) / 4;
+    uv[i * 2 + 1] = p.getZ(i) / 4;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   g.computeVertexNormals();
   return g;
 }
 
+/** קו פתוח שמונח על הקרקע */
+export const drapedLine = (line: Pt[], lift: number): [number, number, number][] => densify(line, 15).map(([x, y]) => [x, tY(x, y) + lift, -y]);
 /** קו מתאר שמונח על הקרקע */
 export const drapedRing = (ring: Pt[], lift: number): [number, number, number][] => densify([...ring, ring[0]], 15).map(([x, y]) => [x, tY(x, y) + lift, -y]);

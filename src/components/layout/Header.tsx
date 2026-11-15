@@ -1,29 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
 import { completionStats, usePlanStore } from '../../store/planStore';
-import { DECK_URL } from '../../data/insights';
+import Icon from '../ui/Icon';
 import { STAGES } from '../../data/stages';
 import Badge from '../ui/Badge';
 
 export default function Header() {
   const topics = usePlanStore((s) => s.topics);
-  const isEditMode = usePlanStore((s) => s.isEditMode);
-  const toggleEditMode = usePlanStore((s) => s.toggleEditMode);
   const selectTopic = usePlanStore((s) => s.selectTopic);
-  const resetData = usePlanStore((s) => s.resetData);
   const setView = usePlanStore((s) => s.setView);
+  const panel = usePlanStore((s) => s.panel);
   const stageId = usePlanStore((s) => s.stage);
   const setStage = usePlanStore((s) => s.setStage);
   const setPanel = usePlanStore((s) => s.setPanel);
   const { total, complete } = completionStats(topics);
-  const [open, setOpen] = useState(false);
-  const menu = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => !menu.current?.contains(e.target as Node) && setOpen(false);
-    window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
-  }, [open]);
 
   return (
     <header className="no-print flex h-14 shrink-0 items-center gap-3 bg-white px-3 shadow-[0_1px_0_#E7E2DA] md:px-6">
@@ -44,6 +32,7 @@ export default function Header() {
 
       {/* ארבעת שלבי העבודה. כל שלב פותח בסרגל שמתחת את הכלים שלו */}
       <nav aria-label="שלבי העבודה" className="flex min-w-0 flex-1 items-stretch justify-center gap-1 overflow-x-auto">
+        <span className="hidden shrink-0 items-center px-2 text-xs text-ink/55 lg:flex">מהלך העבודה</span>
         {STAGES.map((st) => {
           const on = st.id === stageId;
           return (
@@ -62,54 +51,10 @@ export default function Header() {
         })}
       </nav>
 
-      <a
-        className="btn shrink-0 whitespace-nowrap px-3 py-2 text-sm underline decoration-ink/30 underline-offset-4"
-        href={DECK_URL}
-        target="_blank"
-        rel="noreferrer"
-        title="מצגת המתכננים"
-      >
-        המצגת
-      </a>
-
-      <div className="relative shrink-0" ref={menu}>
-        <button
-          className={`btn h-9 w-9 font-semibold ${isEditMode ? 'btn-on' : ''}`}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          title="עריכה ואיפוס"
-          onClick={() => setOpen((o) => !o)}
-        >
-          ר3
-        </button>
-        {open && (
-          <div role="menu" className="fade-in absolute left-0 top-11 z-30 w-64 bg-white p-1 shadow-xl">
-            <button
-              role="menuitem"
-              className="block w-full px-3 py-2 text-right text-sm hover:bg-ink/[0.06]"
-              onClick={() => {
-                toggleEditMode();
-                setPanel(null);
-                setOpen(false);
-              }}
-            >
-              <span className="font-semibold">{isEditMode ? 'סיום עריכה' : 'מצב עריכה'}</span>
-              <span className="block text-xs text-ink/60">השלמת פרקים חסרים ועדכון מפרטים</span>
-            </button>
-            <button
-              role="menuitem"
-              className="block w-full px-3 py-2 text-right text-sm hover:bg-ink/[0.06]"
-              onClick={() => {
-                if (window.confirm('להחזיר את כל הנתונים לנוסח המקורי? העריכות והמשימות שהוספת יימחקו.')) resetData();
-                setOpen(false);
-              }}
-            >
-              <span className="font-semibold">איפוס לנתוני המקור</span>
-              <span className="block text-xs text-ink/60">מוחק את מה שנשמר בדפדפן הזה</span>
-            </button>
-          </div>
-        )}
-      </div>
+      <button className={`btn shrink-0 gap-2 whitespace-nowrap px-3 py-2 text-sm ${panel === 'library' ? 'btn-on' : ''}`} title="מסמכים, קבצים, מקורות ועריכה" aria-pressed={panel === 'library'} onClick={() => setPanel(panel === 'library' ? null : 'library')}>
+        <Icon name="library" size={16} />
+        ספרייה ועריכה
+      </button>
     </header>
   );
 }

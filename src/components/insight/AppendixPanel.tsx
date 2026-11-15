@@ -1,6 +1,7 @@
 import { APPENDICES, DOC_ORDER, LAYER_STEPS } from '../../data/appendices';
 import { usePlanStore } from '../../store/planStore';
 import PanelShell from './PanelShell';
+import ShowBtn from '../ui/ShowBtn';
 import { IconBtn } from '../ui/Icon';
 import AppendixCheck from './AppendixCheck';
 
@@ -15,6 +16,8 @@ export default function AppendixPanel() {
   const docs = [...APPENDICES].sort((a, b) => DOC_ORDER.indexOf(a.id) - DOC_ORDER.indexOf(b.id));
   // השכבה הפעילה: תשריט שפרוש, או שכבת מודל שנבחרה
   const stepOn = LAYER_STEPS.findIndex((l) => (active ? l.sheet === active : !!l.topic && l.topic === topicId));
+  // שכבה שנבחרה מציגה רק את המסמך שלה. בלי בחירה: כל המסמכים
+  const shown = stepOn < 0 ? docs : docs.filter((a) => !!a.sheet && a.sheet === LAYER_STEPS[stepOn].sheet);
   const pick = (i: number) => {
     const l = LAYER_STEPS[i];
     go({ topic: l?.topic ?? null });
@@ -53,9 +56,14 @@ export default function AppendixPanel() {
         )}
       </section>
 
-      <h3 className="mt-5 text-lg font-semibold">המסמכים</h3>
+      <h3 className="mt-5 text-lg font-semibold">{stepOn >= 0 ? `שכבה ${stepOn + 1}: ${LAYER_STEPS[stepOn].name}` : 'כל המסמכים'}</h3>
+      {stepOn >= 0 && LAYER_STEPS[stepOn].topic && (
+        <p className="mt-2 bg-ink/[0.03] p-3 text-sm leading-relaxed">
+          {LAYER_STEPS[stepOn].what} הזכויות של כל מגרש מוצגות בלחיצה על המגרש במודל, או בכפתור "{LAYER_STEPS[stepOn].topic === 'massing' ? 'בינוי וזכויות' : 'מבני ציבור'}" שבסרגל.
+        </p>
+      )}
       <ol className="mt-2 space-y-2">
-        {docs.map((a, i) => {
+        {shown.map((a, i) => {
           const on = active === a.sheet && !!a.sheet;
           return (
             <li key={a.id} className={`grid grid-cols-[2.2rem_1fr] gap-x-2 p-3 ${on ? 'bg-[#F4E9A8]/50' : 'bg-ink/[0.03]'}`}>
@@ -77,7 +85,7 @@ export default function AppendixPanel() {
                     </button>
                   )}
                   {a.sheet && on && <IconBtn icon="top" label="מבט על" onClick={() => setView('top')} />}
-                  {a.go && <IconBtn icon="show" label="הצגת הנושא במודל" onClick={() => go(a.go!)} />}
+                  {a.go && <ShowBtn go={a.go!} className="" />}
                   {a.docs.map((d) => (
                     <a key={d.url} href={d.url} target="_blank" rel="noreferrer" title="פתיחת המסמך" className="btn px-2 py-1.5 text-xs underline decoration-ink/30 underline-offset-4">
                       {d.name}
@@ -91,11 +99,13 @@ export default function AppendixPanel() {
                   ))}
                 </ul>
                 <p className="mt-3 text-xs font-semibold">
-                  <span className="bg-[#F4E9A8] px-1">על מה לשים לב בתכנון</span>
+                  על מה לשים לב בתכנון
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pr-5 text-sm leading-relaxed">
                   {a.watch.map((f) => (
-                    <li key={f}>{f}</li>
+                    <li key={f}>
+                      <span className="bg-[#F4E9A8] px-1">{f}</span>
+                    </li>
                   ))}
                 </ul>
                 <AppendixCheck id={a.id} />

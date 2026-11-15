@@ -1,20 +1,32 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Analysis } from '../../analysis/engine';
 import type { PanelId } from '../../data/insights';
 import { PANEL_HINT, PANEL_NAME, stage as stageInfo } from '../../data/stages';
 import { sortedTopics, usePlanStore } from '../../store/planStore';
 import type { ItemStatus, PlanTopic } from '../../types/plan';
 import { STATUS_LABEL } from '../ui/Badge';
+import { IconBtn } from '../ui/Icon';
 
 const DOT: Record<ItemStatus, string> = { complete: 'bg-done', partial: 'bg-part', pending: 'bg-wait' };
 const STATUTORY = ['massing', 'public'];
 const ANALYSES: { id: Analysis; name: string; hint: string }[] = [
   { id: 'shade', name: 'הצללות', hint: 'צל לפי שעה ועונה' },
-  { id: 'wind', name: 'רוח', hint: 'אזורים מוגנים וחשופים' },
+  { id: 'wind', name: 'רוח', hint: 'כיוון ועוצמה לאורך היום' },
   { id: 'water', name: 'ניקוז', hint: 'לאן הנגר זורם' },
   { id: 'heat', name: 'חום', hint: 'מפת עומס חום' },
 ];
-const PANELS: Record<number, PanelId[]> = { 1: ['appendix'], 2: ['people', 'metrics'], 3: ['section'], 4: ['prep', 'diff', 'status', 'proscons', 'ideas', 'work', 'send'] };
+
+/** פריט בסרגל: נושא, לוח או כלי ניתוח. כולם באותה רמה, ולכן החצים עוברים ביניהם */
+interface Item {
+  key: string;
+  name: string;
+  hint: string;
+  on: boolean;
+  run: (on: boolean) => void;
+  group?: string; // משפחה: מוצגת כתווית לפני הפריט הראשון שלה
+  extra?: ReactNode;
+  color?: string;
+}
 
 /** החלופה שנבחרה בנושא, אם יש בו חלופות */
 function chosen(t: PlanTopic) {
@@ -22,7 +34,7 @@ function chosen(t: PlanTopic) {
   return item?.alternatives?.find((a) => a.id === item.selectedAlternativeId)?.label;
 }
 
-/** סרגל השלב: הכלים, הנושאים והלוחות של השלב שנבחר, ממוספרים. הנבחר בצבע השלב */
+/** סרגל השלב: הכלים, הנושאים והלוחות של השלב שנבחר, ממוספרים, עם חצים לפריט הקודם ולבא */
 export default function TopicSidebar() {
   const topics = usePlanStore((s) => s.topics);
   const selectedTopicId = usePlanStore((s) => s.selectedTopicId);
@@ -36,87 +48,98 @@ export default function TopicSidebar() {
   const addTopic = usePlanStore((s) => s.addTopic);
   const [name, setName] = useState('');
   const st = stageInfo(stageId);
-  const list = sortedTopics(topics).filter((t) => (stageId === 1 ? STATUTORY.includes(t.id) : stageId === 3 ? !STATUTORY.includes(t.id) : false));
-  let n = 0;
 
-  const cls = (on: boolean) =>
-    `flex min-w-max flex-1 items-center justify-center gap-2 px-3 text-sm transition-shadow ${on ? 'font-semibold text-white shadow-lg' : 'bg-white/60 hover:bg-white hover:shadow-sm'}`;
-  const bg = (on: boolean) => (on ? { background: st.color } : undefined);
-  const num = (on: boolean) => <span className={`text-xs ${on ? 'text-white/60' : 'text-ink/40'}`}>{++n}</span>;
-  const panelBtn = (id: PanelId) => {
-    const on = panel === id;
-    return (
-      <button key={id} aria-pressed={on} title={PANEL_HINT[id]} onClick={() => setPanel(on ? null : id)} className={cls(on)} style={bg(on)}>
-        {num(on)}
-        <span className="whitespace-nowrap">{PANEL_NAME[id]}</span>
-      </button>
-    );
+  const panelItem = (id: PanelId, group?: string): Item => ({
+    key: id,
+    name: PANEL_NAME[id]!,
+    hint: PANEL_HINT[id]!,
+    on: panel === id,
+    group,
+    run: (on) => {
+      setAnalysis(null);
+      setPanel(on ? null : id);
+    },
+  });
+  const topicItem = (t: PlanTopic): Item => ({
+    key: t.id,
+    name: t.nameHe,
+    hint: `השכבות של ${t.nameHe}. ${STATUS_LABEL[t.status]}`,
+    on: t.id === selectedTopicId && !panel && !analysis,
+    color: t.layerColor,
+    extra: (
+      <>
+        {t.id === selectedTopicId && chosen(t) && <span className="whitespace-nowrap text-xs font-normal opacity-70">{chosen(t)}</span>}
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${DOT[t.status]}`} />
+      </>
+    ),
+    run: (on) => {
+      setPanel(null);
+      setAnalysis(null);
+      go({ topic: on ? null : t.id });
+    },
+  });
+  const list = sortedTopics(topics);
+  const items: Item[] =
+    stageId === 1
+      ? [panelItem('appendix'), ...list.filter((t) => STATUTORY.includes(t.id)).map(topicItem)]
+      : stageId === 2
+        ? [
+            panelItem('people', 'התאמה'),
+            panelItem('metrics', 'התאמה'),
+            panelItem('reqs', 'התאמה'),
+            ...ANALYSES.map(
+              (x): Item => ({ key: x.id, name: x.name, hint: x.hint, on: analysis === x.id, group: 'אקלים ומים', run: (on) => setAnalysis(on ? null : x.id) }),
+            ),
+          ]
+        : stageId === 3
+          ? [
+              {
+                key: 'all',
+                name: 'כל הנושאים',
+                hint: 'כל שכבות הפיתוח יחד',
+                on: selectedTopicId === null && !panel,
+                run: () => {
+                  setPanel(null);
+                  go({ topic: null });
+                },
+              },
+              ...list.filter((t) => !STATUTORY.includes(t.id)).map(topicItem),
+              panelItem('section'),
+            ]
+          : [panelItem('prep', 'סיכום'), panelItem('diff', 'סיכום'), panelItem('status', 'סיכום'), panelItem('proscons', 'הערכה'), panelItem('ideas', 'הערכה'), panelItem('work', 'פעולה'), panelItem('send', 'פעולה')];
+
+  // חצים: הפריט הקודם והבא באותה רמה
+  const cur = items.findIndex((i) => i.on);
+  const step = (d: number) => {
+    const next = items[(Math.max(0, cur) + d + items.length) % items.length];
+    if (!next.on) next.run(false);
   };
 
   return (
-    <nav aria-label={`שלב ${st.id}: ${st.name}`} className="no-print flex h-12 shrink-0 items-stretch gap-1 overflow-x-auto bg-ink/[0.05] px-2 py-1 md:px-6">
+    <nav aria-label={`שלב ${st.id}: ${st.name}`} className="no-print flex h-12 shrink-0 items-stretch gap-1 overflow-x-auto bg-ink/[0.08] px-2 py-1 md:px-6">
       <span className="hidden shrink-0 items-center px-2 text-xs font-semibold text-white xl:flex" style={{ background: st.color }} title={st.what}>
         {st.tag}
       </span>
-      {stageId === 1 && panelBtn('appendix')}
-      {stageId === 3 && (
-        <button
-          aria-pressed={selectedTopicId === null && !panel}
-          title="כל שכבות הפיתוח יחד"
-          onClick={() => {
-            setPanel(null);
-            go({ topic: null });
-          }}
-          className={cls(selectedTopicId === null && !panel)}
-          style={bg(selectedTopicId === null && !panel)}
-        >
-          כל הנושאים
-        </button>
-      )}
-      {list.map((t) => {
-        const on = t.id === selectedTopicId && !panel;
-        return (
+      {items.map((it, i) => (
+        <span key={it.key} className="flex min-w-max flex-1 items-stretch gap-1">
+          {it.group && it.group !== items[i - 1]?.group && <span className="flex shrink-0 items-center px-1 text-[11px] text-ink/55">{it.group}</span>}
           <button
-            key={t.id}
-            onClick={() => {
-              setPanel(null);
-              go({ topic: on ? null : t.id });
-            }}
-            aria-pressed={on}
-            title={`השכבות של ${t.nameHe}. ${STATUS_LABEL[t.status]}`}
-            className={cls(on)}
-            style={on ? { background: st.color, boxShadow: `inset 0 -4px 0 ${t.layerColor ?? '#fff'}, 0 4px 10px rgba(46,46,43,.25)` } : undefined}
+            aria-pressed={it.on}
+            title={it.hint}
+            onClick={() => it.run(it.on)}
+            className={`flex min-w-max flex-1 items-center justify-center gap-2 px-3 text-sm shadow-[0_1px_0_rgba(46,46,43,.2)] transition-shadow ${it.on ? 'font-semibold text-white shadow-lg' : 'bg-white hover:shadow-md'}`}
+            style={it.on ? { background: st.color, boxShadow: it.color ? `inset 0 -4px 0 ${it.color}, 0 4px 10px rgba(46,46,43,.25)` : undefined } : undefined}
           >
-            {num(on)}
-            <span className="whitespace-nowrap">{t.nameHe}</span>
-            {on && chosen(t) && <span className="whitespace-nowrap text-xs font-normal text-white/70">{chosen(t)}</span>}
-            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${DOT[t.status]} ${on ? 'ring-2 ring-white' : ''}`} />
+            <span className={`text-xs ${it.on ? 'text-white/60' : 'text-ink/40'}`}>{i + 1}</span>
+            <span className="whitespace-nowrap">{it.name}</span>
+            {it.extra}
           </button>
-        );
-      })}
-      {stageId !== 1 && PANELS[stageId].map(panelBtn)}
-      {stageId === 2 &&
-        ANALYSES.map((x) => {
-          const on = analysis === x.id;
-          return (
-            <button key={x.id} aria-pressed={on} title={x.hint} onClick={() => setAnalysis(on ? null : x.id)} className={cls(on)} style={bg(on)}>
-              {num(on)}
-              <span className="whitespace-nowrap">{x.name}</span>
-            </button>
-          );
-        })}
-
-      {/* מקרא הסטטוס, רק בשלבים שיש בהם נושאים */}
-      {list.length > 0 && (
-        <div className="hidden shrink-0 items-center gap-3 px-2 text-xs text-ink/60 lg:flex">
-          {(['complete', 'partial', 'pending'] as ItemStatus[]).map((s) => (
-            <span key={s} className="flex items-center gap-1">
-              <span className={`h-2.5 w-2.5 rounded-full ${DOT[s]}`} />
-              {STATUS_LABEL[s]}
-            </span>
-          ))}
-        </div>
-      )}
+        </span>
+      ))}
+      <span className="flex shrink-0 items-center gap-1">
+        <IconBtn icon="prev" label="הפריט הקודם" onClick={() => step(-1)} />
+        <IconBtn icon="next" label="הפריט הבא" onClick={() => step(1)} />
+      </span>
 
       {isEditMode && stageId === 3 && (
         <form

@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { RULES } from '../../data/rules';
 import { usePlanStore } from '../../store/planStore';
 import PanelShell from './PanelShell';
+import { IconBtn } from '../ui/Icon';
+import Tag from '../ui/Tag';
+import { streetName, streetSpot, type StreetKey } from '../viewport/spots';
 
 type Kind = 'walk' | 'trees' | 'bike' | 'park' | 'road' | 'median';
 interface Strip {
@@ -46,7 +49,9 @@ export default function SectionPanel() {
   const [i, setI] = useState(2);
   const topics = usePlanStore((s) => s.topics);
   const sec = SECTIONS[i];
-  const legend = topics.find((t) => t.id === 'paving')?.items[0]?.legend ?? [];
+  const camTo = usePlanStore((s) => s.camTo);
+  const spot: StreetKey = sec.w >= 36 ? 'avenue' : sec.w >= 23 ? 'road8' : 'local';
+  const legend = topics.find((t) => t.id === 'paving')?.items.find((i) => i.id === 'paving-main')?.legend ?? [];
   const col = (word: string, fallback: string) => legend.find((l) => l.label.includes(word))?.color ?? fallback;
   const FILL: Record<Kind, string> = {
     walk: col('הליכה', '#CDC0AD'),
@@ -77,6 +82,16 @@ export default function SectionPanel() {
             {t.w} מ'
           </button>
         ))}
+      </div>
+
+      <p className="mt-3 text-sm leading-relaxed">
+        <Tag s={1} /> רוחב זכות הדרך, {sec.w} מ': <span className="text-ink/60">נספח תנועה וחניה, 3/124/03/3.</span>
+        <br />
+        <Tag s={3} text="הצעה" /> החלוקה לרצועות: <span className="text-ink/60">הצעה של האפליקציה, לפי אוגדן שפת הרחוב, אוגדן ההיתר ותדריך הזקנה. זה אינו חתך מהנספח ואינו חתך מהמצגת.</span>
+      </p>
+      <div className="no-print mt-2 flex items-center gap-2">
+        <IconBtn icon="show" label="מעבר לרחוב כזה במודל" onClick={() => (({ pos, target }) => camTo(pos, target))(streetSpot(spot))} />
+        <span className="text-xs text-ink/60">במודל: {streetName(spot)}. השיוך לפי סיווג הרחוב, כי שיוך החתכים לרחובות לא נקרא מהנספח.</span>
       </div>
 
       <svg viewBox="0 0 640 330" className="mt-4 w-full" role="img" aria-label={`חתך רחוב ברוחב ${sec.w} מטרים`} direction="ltr">

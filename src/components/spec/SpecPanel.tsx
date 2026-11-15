@@ -19,6 +19,8 @@ import AnalysisPanel from '../insight/AnalysisPanel';
 import AppendixPanel from '../insight/AppendixPanel';
 import SectionPanel from '../insight/SectionPanel';
 import DiffPanel from '../insight/DiffPanel';
+import ReqsPanel from '../insight/ReqsPanel';
+import LibraryPanel from '../insight/LibraryPanel';
 import SendPanel from '../insight/SendPanel';
 
 export default function SpecPanel() {
@@ -55,6 +57,10 @@ export default function SpecPanel() {
         <AppendixPanel />
       ) : panel === 'section' ? (
         <SectionPanel />
+      ) : panel === 'reqs' ? (
+        <ReqsPanel />
+      ) : panel === 'library' ? (
+        <LibraryPanel />
       ) : panel === 'diff' ? (
         <DiffPanel />
       ) : panel === 'send' ? (

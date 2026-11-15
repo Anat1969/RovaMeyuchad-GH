@@ -37,6 +37,13 @@ export function pushRibbon(out: number[], pts: Pt[], width: number, y: number) {
 export function ribbonGeometry(positions: number[]) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  // מרקם לפי מיקום בעולם: 4 מ' לכל חזרה של הדוגמה
+  const uv = new Float32Array((positions.length / 3) * 2);
+  for (let i = 0; i < positions.length / 3; i++) {
+    uv[i * 2] = positions[i * 3] / 4;
+    uv[i * 2 + 1] = positions[i * 3 + 2] / 4;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   g.computeVertexNormals();
   return g;
 }

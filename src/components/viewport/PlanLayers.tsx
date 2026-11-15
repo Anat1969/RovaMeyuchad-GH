@@ -8,6 +8,9 @@ import { headings, offsetLine, ribbonGeometry, type Pt } from './geometry';
 import { pushRibbonT as pushRibbon, tY } from '../../analysis/terrain';
 import { EXISTING_TREES } from '../../data/existingTrees';
 import { RULES } from '../../data/rules';
+import { QUARTER } from '../../data/quarterData';
+import { drapedShape } from '../../analysis/terrain';
+import { PAVE_OF, paveTexture } from './paveTex';
 import { resolveStyle, type PieceRef } from './layerStyle';
 
 /**
@@ -31,6 +34,7 @@ interface InstGroup extends PieceRef {
 interface RibbonGroup extends PieceRef {
   positions: number[];
   realOnly?: boolean; // מוצג רק בהדמיה הריאליסטית
+  under?: boolean; // משטח שמונח מתחת לכביש: פינות הצומת
 }
 
 /** נוף עץ ריאליסטי: שלושה גושים חופפים במקום כדור אחד */
@@ -119,7 +123,8 @@ function findJunctions(): Junction[] {
     const c: Pt = [g.pts.reduce((a, q) => a + q[0], 0) / g.pts.length, g.pts.reduce((a, q) => a + q[1], 0) / g.pts.length];
     if (out.some((j) => j.round && dist(j.c, c) < 38)) continue;
     const spread = Math.max(...g.pts.map((q) => dist(q, c)));
-    out.push({ c, r: Math.min(32, g.half + 8.5 + spread), road: Math.min(24, g.half + 2 + spread), round: false });
+    // צומת רגיל אינו כיכר: משטח האספלט רק ממלא את הפינה, בלי להתרחב לעיגול
+    out.push({ c, r: Math.min(26, g.half + 6.5 + spread * 0.6), road: Math.min(18, g.half * 1.12 + spread * 0.6), round: false });
   }
   return out;
 }
@@ -154,9 +159,9 @@ function build() {
   const add = (ref: PieceRef, shape: Shape, at: Pt, y: number, s: Inst['s'], r = 0) => {
     if (!inJ(at)) put(ref, shape, at, y, s, r);
   };
-  const band = (ref: PieceRef, tag = '', realOnly = false) => {
+  const band = (ref: PieceRef, tag = '', realOnly = false, under = false) => {
     const k = key(ref) + tag;
-    if (!ribbons.has(k)) ribbons.set(k, { ...ref, positions: [], realOnly });
+    if (!ribbons.has(k)) ribbons.set(k, { ...ref, positions: [], realOnly, under });
     return ribbons.get(k)!.positions;
   };
   // רצועה לאורך הרחוב, שנקטעת בכניסה לצומת
@@ -178,7 +183,7 @@ function build() {
   const PAVE: PieceRef = { layer: 'paving', item: 'paving-main', idx: 0 };
   const ASPHALT: PieceRef = { layer: 'road', item: 'road', fixed: '#5B5C5F' };
   for (const j of junctions) {
-    pushDisc(band(PAVE, 'j', true), j.c, 0, j.r, 0.05);
+    pushDisc(band(PAVE, 'j', false, true), j.c, 0, j.r, 0.05);
     pushDisc(band(ASPHALT), j.c, 0, j.road, 0.09);
     if (j.round) {
       pushDisc(band({ layer: 'paving', item: 'paving-main', idx: 1 }), j.c, ROUND.island, ROUND.apron, 0.2);
@@ -193,6 +198,27 @@ function build() {
     }
   }
 
+  /** המרחק אל המסלול המקביל של אותו רחוב בצד הנתון, או null כשאין כזה */
+  const twinGap = (ri: number, side: number): number | null => {
+    const run = CONTEXT.planRuns[ri];
+    const pts = run.pts as Pt[];
+    const probe = offsetLine(pts, side * (run.w / 2 + 6));
+    let hits = 0;
+    let sum = 0;
+    for (let i = 0; i < pts.length; i += 3) {
+      let best = Infinity;
+      CONTEXT.planRuns.forEach((o, oi) => {
+        if (oi === ri || o.n !== run.n) return;
+        for (const q of o.pts as Pt[]) best = Math.min(best, dist(q, probe[i]));
+      });
+      if (best < 14) {
+        hits++;
+        sum += Math.max(0, dist(pts[i], probe[i]) + best - run.w);
+      }
+    }
+    return hits >= Math.max(2, pts.length / 6) ? Math.min(14, sum / hits + 2) : null;
+  };
+
   CONTEXT.planRuns.forEach((run, ri) => {
     const half = run.w / 2;
     const line = run.pts as Pt[];
@@ -200,6 +226,12 @@ function build() {
     const ang = headings(line);
     for (const side of [1, -1]) {
       const at = (d: number) => offsetLine(line, side * (half + d));
+      // שדרה עם שני מסלולים: בצד הפנימי אין מדרכה, אלא אי תנועה מגונן שממלא את הרווח
+      const gap = twinGap(ri, side);
+      if (gap !== null) {
+        strip({ layer: 'planting', item: 'groundcover', idx: 0 }, at(gap / 4), gap / 2 + 0.4, 0.14);
+        continue;
+      }
       // ריצוף, לפי אזורי החלופה שנבחרה: רצועת הליכה, רצועת שירות, ורצועת חנייה בשולי הכביש
       strip({ layer: 'paving', item: 'paving-main', idx: 0 }, at(4.4), 3.2, 0.16);
       strip({ layer: 'paving', item: 'paving-main', idx: 1 }, at(2.3), 1, 0.18);
@@ -330,11 +362,15 @@ function Ribbon({ g }: { g: RibbonGroup }) {
   const geo = useMemo(() => ribbonGeometry(g.positions), [g]);
   const style = useStyle(g);
   const real = useReal();
-  // הכביש עצמו מוצג רק בהדמיה הריאליסטית. במודל הוא חלק מסכמת הרחובות
-  if ((g.layer === 'road' || g.realOnly) && !real) return null;
+  const topics = usePlanStore((s) => s.topics);
+  if (g.realOnly && !real) return null;
+  // ריצוף: דוגמת האבן של החלופה שנבחרה
+  const alt = g.layer === 'paving' ? topics.find((t) => t.id === 'paving')?.items.find((i) => i.id === g.item)?.selectedAlternativeId : undefined;
+  const map = alt && PAVE_OF[alt] && !style.ghost ? paveTexture(PAVE_OF[alt]) : null;
   return (
     <mesh
       geometry={geo}
+      renderOrder={g.under ? 0 : g.layer === 'road' ? 1 : 2}
       receiveShadow={real}
       onClick={(e) => {
         e.stopPropagation();
@@ -342,7 +378,12 @@ function Ribbon({ g }: { g: RibbonGroup }) {
       }}
     >
       <meshStandardMaterial
-        color={style.color}
+        key={map ? 'tex' : 'flat'}
+        polygonOffset
+        polygonOffsetFactor={g.under ? -1 : g.layer === 'road' ? -2 : -4}
+        polygonOffsetUnits={g.under ? -1 : g.layer === 'road' ? -2 : -4}
+        map={map}
+        color={g.layer === 'road' && !real ? '#9A9A9C' : style.color}
         transparent
         opacity={style.opacity}
         wireframe={style.ghost}
@@ -354,6 +395,25 @@ function Ribbon({ g }: { g: RibbonGroup }) {
   );
 }
 
+/** שבילים חוצי רובע: מוצגים על זיקות ההנאה למעבר הציבור שבתכנית, בדוגמת החלופה שנבחרה */
+function Paths() {
+  const ref: PieceRef = { layer: 'paving', item: 'paving-paths', idx: 0 };
+  const style = useStyle(ref);
+  const topics = usePlanStore((s) => s.topics);
+  const geos = useMemo(() => QUARTER.easements.map((r) => drapedShape(r as Pt[], 0.45)), []);
+  const alt = topics.find((t) => t.id === 'paving')?.items.find((i) => i.id === 'paving-paths')?.selectedAlternativeId;
+  const map = alt && PAVE_OF[alt] ? paveTexture(PAVE_OF[alt]) : null;
+  return (
+    <group>
+      {geos.map((g, i) => (
+        <mesh key={i} geometry={g} renderOrder={2} onClick={(e) => (e.stopPropagation(), pick(ref))}>
+          <meshStandardMaterial key={map ? 'tex' : 'flat'} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} map={map} color={style.color} transparent opacity={style.opacity} side={THREE.DoubleSide} depthWrite={false} roughness={0.95} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 export default function PlanLayers() {
   const { inst, ribbons } = useMemo(build, []);
   const sheetOn = usePlanStore((s) => s.appendix) !== null;
@@ -362,6 +422,7 @@ export default function PlanLayers() {
   if (sheetOn || statutory) return null;
   return (
     <group>
+      <Paths />
       {ribbons.map((g, i) => (
         <Ribbon key={`r${i}`} g={g} />
       ))}

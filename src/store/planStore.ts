@@ -6,7 +6,7 @@ import { PUBLIC } from '../data/publicData';
 const PUBLIC_NUMS = new Set(PUBLIC.lots.map((l) => l.num));
 import { PLAN_TOPICS, withAlternative } from '../data/planData';
 import { SEED_TASKS, type Go, type PanelId } from '../data/insights';
-import { stageOf, type StageId } from '../data/stages';
+import type { StageId } from '../data/stages';
 import type { Analysis, Params } from '../analysis/engine';
 
 /** משימה בתוכנית העבודה */
@@ -53,7 +53,9 @@ interface PlanState {
   analysis: Analysis | null; // כלי הניתוח הפעיל: הצללות, רוח, ניקוז או חום
   analysisParams: Params;
   sunPlaying: boolean;
-  appendix: string | null; // תשריט נספח שפרוש על המודל
+  appendix: string | null;
+  customSheet: { img: string; name: string; cx: number; cy: number; w: number; h: number; angle: number } | null;
+  setCustomSheet: (c: PlanState['customSheet']) => void; // תשריט נספח שפרוש על המודל
   savedAt: number;
 
   selectTopic: (id: string | null, itemId?: string) => void;
@@ -67,6 +69,13 @@ interface PlanState {
   setLegendFocus: (f: LegendFocus | null) => void;
   selectLot: (num: string | null) => void;
   setView: (name: CameraView) => void;
+  cam: { pos: V3; target: V3; tick: number };
+  camTo: (pos: V3, target: V3) => void;
+  savedViews: { name: string; pos: V3; target: V3 }[];
+  saveView: (v: { name: string; pos: V3; target: V3 }) => void;
+  removeView: (i: number) => void;
+  checks: Record<string, { done: boolean; note?: string; removed?: boolean }>;
+  setCheck: (id: string, patch: { done?: boolean; note?: string; removed?: boolean }) => void;
   zoomBy: (dir: 1 | -1) => void;
   zoomToBox: (nx: number, ny: number, scale: number) => void;
   setContextMode: (m: ContextMode) => void;
@@ -85,6 +94,7 @@ interface PlanState {
   removeTask: (id: string) => void;
 }
 
+export type V3 = [number, number, number];
 const clone = (t: PlanTopic[]): PlanTopic[] => JSON.parse(JSON.stringify(t));
 
 /** סטטוס נושא נגזר מהפריטים שלו */
@@ -118,9 +128,11 @@ export const usePlanStore = create<PlanState>()(
       tasks: seedTasks(),
       lightbox: null,
       analysis: null,
-      analysisParams: { season: 'summer', hour: 10, windFrom: 315, day: false, design: true },
+      analysisParams: { season: 'summer', hour: 10, windFrom: 315, day: false, windDay: true, design: true },
       sunPlaying: true,
       appendix: null,
+      customSheet: null,
+      setCustomSheet: (c) => set({ customSheet: c, appendix: c ? 'custom' : null }),
       savedAt: 0,
 
       selectTopic: (id, itemId) =>
@@ -219,6 +231,14 @@ export const usePlanStore = create<PlanState>()(
             : { selectedLot: null, selectedTopicId: s.selectedTopicId },
         ),
       setView: (name) => set((s) => ({ view: { name, tick: s.view.tick + 1 } })),
+      cam: { pos: [0, 0, 0], target: [0, 0, 0], tick: 0 },
+      camTo: (pos, target) => set((s) => ({ cam: { pos, target, tick: s.cam.tick + 1 } })),
+      savedViews: [],
+      saveView: (v) => set((s) => ({ savedViews: [...s.savedViews, v] })),
+      removeView: (i) => set((s) => ({ savedViews: s.savedViews.filter((_, k) => k !== i) })),
+      // סימוני "בוצע" והערות, לכל דרישה, מדד או הבדל, לפי מזהה
+      checks: {},
+      setCheck: (id, patch) => set((s) => ({ savedAt: Date.now(), checks: { ...s.checks, [id]: { ...(s.checks[id] ?? { done: false }), ...patch } } })),
       zoomBy: (dir) => set((s) => ({ zoom: { dir, tick: s.zoom.tick + 1 } })),
       zoomToBox: (nx, ny, scale) => set((s) => ({ box: { nx, ny, scale, tick: s.box.tick + 1 } })),
       setContextMode: (m) => set({ contextMode: m }),
@@ -242,7 +262,6 @@ export const usePlanStore = create<PlanState>()(
           return {
             topics,
             legendFocus: null,
-            ...(g.topic !== undefined && { analysis: null }),
             ...(topic !== undefined && {
               selectedTopicId: topic?.id ?? null,
               selectedItemId: topic ? (g.item ?? topic.items[0]?.id ?? null) : null,
@@ -259,7 +278,7 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: 'rova3d-plan-v6',
-      version: 1,
+      version: 2,
       // גרסה 1: פרקי הנטיעות עוברים ל"חלקי", כי במצגת הם מסומנים "יעודכן בתכנון מפורט". שאר העריכות נשמרות
       migrate: (old, v) => {
         const s = old as { topics?: PlanTopic[] };
@@ -268,9 +287,13 @@ export const usePlanStore = create<PlanState>()(
             t.id !== 'planting' ? t : { ...t, status: 'partial', items: t.items.map((i) => (i.status === 'complete' ? { ...i, status: 'partial' as ItemStatus } : i)) },
           );
         }
+        // גרסה 2: שבילים חוצי רובע קודמים לריצוף הרחובות
+        if (v < 2 && s.topics) {
+          s.topics = s.topics.map((t) => (t.id !== 'paving' ? t : { ...t, items: [...t.items].sort((a, b) => Number(b.id === 'paving-paths') - Number(a.id === 'paving-paths')) }));
+        }
         return s as never;
       },
-      partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode, renderMode: s.renderMode, massMode: s.massMode, tasks: s.tasks, stage: s.stage }),
+      partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode, renderMode: s.renderMode, massMode: s.massMode, tasks: s.tasks, stage: s.stage, savedViews: s.savedViews, checks: s.checks }),
     },
   ),
 );
@@ -290,8 +313,3 @@ export function completionStats(topics: PlanTopic[]) {
   return { total: topics.length, complete: topics.filter((t) => t.status === 'complete').length };
 }
 
-// השלב עוקב אחרי מה שמוצג: בחירת נושא, לוח או ניתוח מכל מקום מעבירה לשלב שלו
-usePlanStore.subscribe((s) => {
-  const st = stageOf(s);
-  if (st && st !== s.stage) usePlanStore.setState({ stage: st });
-});

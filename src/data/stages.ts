@@ -31,6 +31,8 @@ const PANEL_STAGE: Record<PanelId, StageId> = {
   ideas: 4,
   work: 4,
   send: 4,
+  reqs: 2,
+  library: 4,
 };
 /** לאיזה שלב שייך מה שמוצג כרגע. null: אין מה שמכריע, והשלב נשאר */
 export function stageOf(s: { analysis: Analysis | null; panel: PanelId | null; selectedTopicId: string | null }): StageId | null {
@@ -42,6 +44,8 @@ export function stageOf(s: { analysis: Analysis | null; panel: PanelId | null; s
 export const PANEL_NAME: Partial<Record<PanelId, string>> = {
   appendix: 'שכבות התב"ע',
   people: 'אוכלוסיות',
+  reqs: 'תקנות, אוגדן והנחיות',
+  library: 'ספרייה ועריכה',
   metrics: '44 מדדים',
   section: 'חתך רחוב',
   diff: 'תב"ע מול תכנון',
@@ -55,6 +59,8 @@ export const PANEL_NAME: Partial<Record<PanelId, string>> = {
 export const PANEL_HINT: Partial<Record<PanelId, string>> = {
   appendix: 'נספחים על המודל, שכבה שכבה',
   people: 'התאמה לזקנים ולילדים',
+  reqs: 'דרישות שלא מתקיימות',
+  library: 'מסמכים, קבצים ומקורות',
   metrics: '44 מדדי שכונה 360',
   section: 'חתך בקנה מידה',
   diff: 'איפה התכנון סוטה מהתב"ע',

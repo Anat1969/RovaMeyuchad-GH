@@ -8,6 +8,7 @@ import ContextLayer from './ContextLayer';
 import PublicLots from './PublicLots';
 import { IconBtn } from '../ui/Icon';
 import Tag from '../ui/Tag';
+import { streetSpot } from './spots';
 import { DESIGNS } from '../../data/designData';
 import AnalysisLayer from './AnalysisLayer';
 import AppendixSheet from './AppendixSheet';
@@ -36,6 +37,9 @@ const VIEWS: Record<CameraView | 'detail', View> = {
   detail: DETAIL,
 };
 
+/** המבט הנוכחי, לשמירה */
+export const camNow: { get: () => { pos: V3; target: V3 } | null } = { get: () => null };
+
 /** במסך צר הרובע רחב מהחלון, ולכן המצלמה מתרחקת */
 function viewOf(name: CameraView | 'detail'): View {
   const v = VIEWS[name];
@@ -58,9 +62,21 @@ function CameraRig() {
   const pos = useMemo(() => new THREE.Vector3(), []);
   const tgt = useMemo(() => new THREE.Vector3(), []);
 
+  // מעבר לנקודה מסוימת: מבט שמור, או מקום שלוח הפנה אליו
+  const cam = usePlanStore((s) => s.cam);
+  useEffect(() => {
+    if (cam.tick === 0) return;
+    pos.set(...cam.pos);
+    tgt.set(...cam.target);
+    moving.current = true;
+  }, [cam, pos, tgt]);
+  useEffect(() => {
+    camNow.get = () => (controls ? { pos: camera.position.toArray() as V3, target: controls.target.toArray() as V3 } : null);
+  }, [camera, controls]);
+
   useEffect(() => {
     if (view.tick === 0) return;
-    const v = viewOf(view.name);
+    const v = view.name === 'street' ? streetSpot('road8', true) : viewOf(view.name);
     pos.set(...v.pos);
     tgt.set(...v.target);
     moving.current = true;
@@ -203,6 +219,11 @@ export default function Viewport3D() {
   const setView = usePlanStore((s) => s.setView);
   const panel = usePlanStore((s) => s.panel);
   const setPanel = usePlanStore((s) => s.setPanel);
+  const savedViews = usePlanStore((s) => s.savedViews);
+  const saveView = usePlanStore((s) => s.saveView);
+  const removeView = usePlanStore((s) => s.removeView);
+  const camTo = usePlanStore((s) => s.camTo);
+  const [viewsOpen, setViewsOpen] = useState(false);
   const zoomToBox = usePlanStore((s) => s.zoomToBox);
   // כלי הזום למלבן: גוררים מלבן על המודל
   const [boxMode, setBoxMode] = useState(false);
@@ -244,7 +265,7 @@ export default function Viewport3D() {
           zoomSpeed={1.2}
           target={start.target}
           maxPolarAngle={Math.PI / 2 - 0.03}
-          minDistance={12}
+          minDistance={6}
           maxDistance={16000}
         />
         <CameraRig />
@@ -278,6 +299,7 @@ export default function Viewport3D() {
         <IconBtn icon="box" label="זום למלבן" on={boxMode} onClick={() => setBoxMode((b) => !b)} />
         <IconBtn icon="zoomIn" label="התקרבות" onClick={() => zoomBy(1)} />
         <IconBtn icon="zoomOut" label="התרחקות" onClick={() => zoomBy(-1)} />
+        <IconBtn icon="bookmark" label="מבטים שמורים" on={viewsOpen} onClick={() => setViewsOpen((o) => !o)} />
         {real && (
           <>
             <span className="my-0.5 h-px bg-ink/15" />
@@ -353,6 +375,36 @@ export default function Viewport3D() {
         </div>
       )}
 
+      {viewsOpen && (
+        <div className="no-print absolute left-14 top-3 z-10 w-56 bg-white p-2 shadow-xl">
+          <div className="flex items-center">
+            <span className="flex-1 text-xs font-semibold">מבטים שמורים</span>
+            <IconBtn icon="close" label="סגירה" className="!h-6 !w-6" onClick={() => setViewsOpen(false)} />
+          </div>
+          <button
+            className="btn mt-1 w-full py-1.5 text-xs"
+            title="שמירת המבט שמוצג עכשיו"
+            onClick={() => {
+              const c = camNow.get();
+              if (c) saveView({ name: `מבט ${savedViews.length + 1}`, ...c });
+            }}
+          >
+            שמירת המבט הנוכחי
+          </button>
+          <ul className="mt-1 space-y-1">
+            {savedViews.map((v, i) => (
+              <li key={i} className="flex items-center gap-1">
+                <button className="btn flex-1 justify-start py-1.5 text-xs" title="חזרה למבט הזה" onClick={() => camTo(v.pos, v.target)}>
+                  {v.name}
+                </button>
+                <IconBtn icon="trash" label="מחיקת המבט" className="!h-7 !w-7" onClick={() => removeView(i)} />
+              </li>
+            ))}
+          </ul>
+          {savedViews.length === 0 && <p className="mt-1 text-xs text-ink/55">מסובבים את המודל למבט הרצוי, ושומרים. המבטים נשמרים בדפדפן.</p>}
+        </div>
+      )}
+
       {/* מה מוצג, ומה מקור הגיאומטריה */}
       <div className="pointer-events-none absolute right-3 top-3 hidden max-w-[46%] bg-white/90 px-2 py-1 text-xs leading-relaxed text-ink/80 md:block">
         {appendix ? (
@@ -372,7 +424,10 @@ export default function Viewport3D() {
         ) : development ? (
           <>
             <Tag s={3} /> <span className="font-semibold">{topic.nameHe} על רחובות התוכנית.</span> מיקום הרכיבים לאורך הרחוב סכמטי.{' '}
-            <span className="text-ink/60">מקור: מצגת שפת רחוב ושצ"פ. מרווחים: אוגדן שפת הרחוב ואוגדן ההנחיות להיתר. עצים קיימים: נספח העצים.</span>
+            <span className="text-ink/60">
+              מקור: מצגת שפת רחוב ושצ"פ. העצים החדשים: כל 6 מ' לאורך אבן השפה, לפי אוגדן שפת הרחוב, ולא לפי הנספח הנופי או נספחי התשתיות. עצים קיימים: נספח העצים. שבילים
+              חוצי רובע: על זיקות ההנאה שבתכנית.
+            </span>
           </>
         ) : (
           <>

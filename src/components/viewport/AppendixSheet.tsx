@@ -7,7 +7,9 @@ import { usePlanStore } from '../../store/planStore';
 /** תשריט של נספח, פרוש על הקרקע במקומו. המודל נשאר מעליו */
 export default function AppendixSheet() {
   const id = usePlanStore((s) => s.appendix);
-  const sheet = SHEETS.find((s) => s.id === id);
+  const custom = usePlanStore((s) => s.customSheet);
+  // תשריט של נספח, או תמונה שהועלתה בספרייה
+  const sheet = id === 'custom' ? custom : SHEETS.find((s) => s.id === id);
   const [tex, setTex] = useState<THREE.Texture | null>(null);
   useEffect(() => {
     setTex(null);
@@ -22,10 +24,10 @@ export default function AppendixSheet() {
     return () => {
       alive = false;
     };
-  }, [sheet]);
+  }, [sheet?.img]);
   useEffect(() => () => tex?.dispose(), [tex]);
   // התשריט מונח על הטופוגרפיה, במקומו ובזווית שלו
-  const geo = useMemo(() => (sheet ? drapedPlane(sheet.cx, sheet.cy, sheet.w, sheet.h, sheet.angle, 1) : null), [sheet]);
+  const geo = useMemo(() => (sheet ? drapedPlane(sheet.cx, sheet.cy, sheet.w, sheet.h, sheet.angle, 1) : null), [sheet?.cx, sheet?.cy, sheet?.w, sheet?.h, sheet?.angle]);
   if (!sheet || !tex) return null;
   return (
     <mesh geometry={geo!} renderOrder={3}>
