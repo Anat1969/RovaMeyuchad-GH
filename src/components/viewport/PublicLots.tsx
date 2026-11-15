@@ -114,9 +114,11 @@ function Lot({ lot }: { lot: PublicLot }) {
   const isSel = selectedLot === lot.num;
   const active = topicId === 'public';
   // בנושאי הפיתוח ובנושא הבינוי, מגרשי הציבור נסוגים לרקע
-  const back = topicId !== null && !active;
+  const sheetOn = usePlanStore((s) => s.appendix) !== null;
+  const back = sheetOn || (topicId !== null && !active);
   const kinds = Object.keys(KIND);
   let fade = back ? 0.18 : 1;
+  if (sheetOn && !meta.built) return null;
   if (active && selectedLot) fade = isSel ? 1 : 0.25;
   else if (active && focus) fade = kinds.indexOf(lot.kind) === focus.idx ? 1 : 0.15;
   const pick = () => selectLot(isSel ? null : lot.num);
@@ -132,7 +134,7 @@ function Lot({ lot }: { lot: PublicLot }) {
 
   return (
     <group>
-      {!real && <Slab ring={lot.ring as Ring} y={0.1} color={meta.color} opacity={0.3 * fade + 0.08} onClick={pick} />}
+      {!real && !sheetOn && <Slab ring={lot.ring as Ring} y={0.1} color={meta.color} opacity={0.3 * fade + 0.08} onClick={pick} />}
       {!real && <Line points={flat(lot.ring as Ring, 0.25)} color={isSel ? '#2E2E2B' : meta.color} lineWidth={isSel ? 3 : 1.5} />}
       {massMode === 'rights' ? (
         // מעטפת הזכויות: המגרש מוקטן לאחוז התכסית, ומוגבה לגובה המרבי

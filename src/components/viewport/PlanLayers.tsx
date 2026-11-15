@@ -217,6 +217,8 @@ function Ribbon({ g }: { g: RibbonGroup }) {
 
 export default function PlanLayers() {
   const { inst, ribbons } = useMemo(build, []);
+  const sheetOn = usePlanStore((s) => s.appendix) !== null;
+  if (sheetOn) return null;
   return (
     <group>
       {ribbons.map((g, i) => (

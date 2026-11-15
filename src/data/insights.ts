@@ -40,7 +40,7 @@ export interface InsightPanel {
   tabs?: boolean; // מיני-סרגל: בלוק אחד בכל פעם
 }
 
-export type PanelId = 'prep' | 'people' | 'metrics' | 'status' | 'proscons' | 'ideas' | 'work';
+export type PanelId = 'prep' | 'people' | 'metrics' | 'appendix' | 'status' | 'proscons' | 'ideas' | 'work';
 
 export const TONE_LABEL: Record<Tone, string> = {
   ok: 'קיים',

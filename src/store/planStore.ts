@@ -48,6 +48,7 @@ interface PlanState {
   analysis: Analysis | null; // כלי הניתוח הפעיל: הצללות, רוח, ניקוז או חום
   analysisParams: Params;
   sunPlaying: boolean;
+  appendix: string | null; // תשריט נספח שפרוש על המודל
   savedAt: number;
 
   selectTopic: (id: string | null, itemId?: string) => void;
@@ -71,6 +72,7 @@ interface PlanState {
   setAnalysis: (a: Analysis | null) => void;
   setAnalysisParams: (p: Partial<Params>) => void;
   setSunPlaying: (b: boolean) => void;
+  setAppendix: (id: string | null) => void;
   /** קישור מתובנה אל המודל: בוחר נושא, פריט וחלופה. המצלמה לא זזה: המבט נשאר של המשתמשת */
   go: (g: Go) => void;
   addTask: (t: Omit<WorkTask, 'id' | 'done'>) => void;
@@ -108,6 +110,7 @@ export const usePlanStore = create<PlanState>()(
       analysis: null,
       analysisParams: { season: 'summer', hour: 10, windFrom: 315, day: false },
       sunPlaying: true,
+      appendix: null,
       savedAt: 0,
 
       selectTopic: (id, itemId) =>
@@ -211,10 +214,11 @@ export const usePlanStore = create<PlanState>()(
       setContextMode: (m) => set({ contextMode: m }),
       setRenderMode: (m) => set({ renderMode: m }),
       setMassMode: (m) => set({ massMode: m }),
-      setPanel: (p) => set({ panel: p, ...(p && { analysis: null }) }),
+      setPanel: (p) => set((s) => ({ panel: p, ...(p && { analysis: null }), appendix: p === 'appendix' ? s.appendix : null })),
       setLightbox: (src) => set({ lightbox: src }),
-      setAnalysis: (a) => set({ analysis: a, ...(a && { panel: null }) }),
+      setAnalysis: (a) => set({ analysis: a, ...(a && { panel: null, appendix: null }) }),
       setSunPlaying: (b) => set({ sunPlaying: b }),
+      setAppendix: (id) => set({ appendix: id, analysis: null }),
       setAnalysisParams: (p) => set((s) => ({ analysisParams: { ...s.analysisParams, ...p } })),
       go: (g) =>
         set((s) => {

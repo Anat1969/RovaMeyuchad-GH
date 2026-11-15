@@ -15,6 +15,7 @@ import StatusPanel from '../insight/StatusPanel';
 import WorkPlan from '../insight/WorkPlan';
 import MetricsPanel from '../insight/MetricsPanel';
 import AnalysisPanel from '../insight/AnalysisPanel';
+import AppendixPanel from '../insight/AppendixPanel';
 
 export default function SpecPanel() {
   const { topic, item } = useSelection();
@@ -45,6 +46,8 @@ export default function SpecPanel() {
     >
       {analysis ? (
         <AnalysisPanel key={analysis} a={analysis} />
+      ) : panel === 'appendix' ? (
+        <AppendixPanel />
       ) : panel === 'status' ? (
         <StatusPanel />
       ) : panel === 'work' ? (

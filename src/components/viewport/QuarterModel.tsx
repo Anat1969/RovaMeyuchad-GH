@@ -114,7 +114,8 @@ function Lot({ lot, real }: { lot: QuarterLot; real: boolean }) {
   const selectLot = usePlanStore((s) => s.selectLot);
   const topicId = usePlanStore((s) => s.selectedTopicId);
   // בנושא פיתוח המסות נסוגות לרקע, כדי שהרחוב ייראה
-  const back = topicId !== null && topicId !== 'massing';
+  const sheetOn = usePlanStore((s) => s.appendix) !== null;
+  const back = sheetOn || (topicId !== null && topicId !== 'massing');
   const massMode = usePlanStore((s) => s.massMode);
   const design = DESIGNS.find((d) => d.lot === lot.num);
 
@@ -173,7 +174,7 @@ function Lot({ lot, real }: { lot: QuarterLot; real: boolean }) {
 
   return (
     <group>
-      <Solid ring={lot.ring} base={0.05} height={0} color={lot.mixed ? cMixed : cRes} opacity={0.35 * fade(useIdx) + 0.1} onClick={pick} />
+      {!sheetOn && <Solid ring={lot.ring} base={0.05} height={0} color={lot.mixed ? cMixed : cRes} opacity={0.35 * fade(useIdx) + 0.1} onClick={pick} />}
       <Line points={flat(lot.ring, 0.2)} color={isSel ? '#2E2E2B' : '#B9895A'} lineWidth={isSel ? 3 : 1} />
       {podium && <Solid ring={podium} base={0.1} height={PODIUM_H} color={cPodium} opacity={fade(2)} onClick={pick} />}
       <Solid ring={tower} base={towerBase} height={towerH} color={lot.mixed ? cMixed : cRes} opacity={fade(useIdx)} onClick={pick} />

@@ -7,6 +7,7 @@ const HINT: Record<string, string> = {
   prep: 'עמדה, פערים ושאלות לישיבה',
   people: 'התאמה לזקנים ולילדים',
   metrics: '44 מדדי שכונה 360',
+  appendix: 'נספחים על המודל',
   status: 'אילו פרקים הוגשו',
   proscons: 'חוזקות וסיכונים',
   ideas: 'צעדים לשיפור',
@@ -16,6 +17,7 @@ const HINT: Record<string, string> = {
 const BUTTONS: { id: PanelId; name: string }[] = [
   ...PANELS.filter((p) => p.id === 'prep' || p.id === 'people').map((p) => ({ id: p.id, name: p.name })),
   { id: 'metrics', name: 'התאמה למדדים' },
+  { id: 'appendix', name: 'נספחי התב"ע' },
   { id: 'status', name: 'מה בוצע' },
   ...PANELS.filter((p) => p.id === 'proscons' || p.id === 'ideas').map((p) => ({ id: p.id, name: p.name })),
   { id: 'work', name: 'תוכנית עבודה' },
@@ -66,7 +68,7 @@ export default function Header() {
             aria-pressed={panel === b.id}
             title={HINT[b.id]}
             onClick={() => setPanel(panel === b.id ? null : b.id)}
-            className={`btn shrink-0 whitespace-nowrap px-3 py-2 text-sm ${panel === b.id ? 'btn-on shadow-md' : ''}`}
+            className={`btn shrink-0 whitespace-nowrap px-2.5 py-2 text-sm ${panel === b.id ? 'btn-on shadow-md' : ''}`}
           >
             {b.name}
           </button>

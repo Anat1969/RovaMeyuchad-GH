@@ -1,0 +1,2 @@
+// נוצר מעיגון התשריטים מול מגרשי התכנית. מטרים מקומיים, זווית ברדיאנים.
+export const SHEETS: { id: string; img: string; cx: number; cy: number; w: number; h: number; angle: number }[] = [{"id": "approved", "img": "/appendix/approved.jpg", "cx": 22.9, "cy": -175.4, "w": 1576.2, "h": 1505.2, "angle": 0}, {"id": "traffic", "img": "/appendix/traffic.jpg", "cx": -90.7, "cy": -39.6, "w": 1246.1, "h": 1142.1, "angle": 0.56181}, {"id": "sewage", "img": "/appendix/sewage.jpg", "cx": -4.8, "cy": 13.9, "w": 1295.3, "h": 1166.4, "angle": 0.56181}];

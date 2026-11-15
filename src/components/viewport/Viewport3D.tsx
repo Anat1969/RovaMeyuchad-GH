@@ -9,6 +9,8 @@ import PublicLots from './PublicLots';
 import { IconBtn } from '../ui/Icon';
 import { DESIGNS } from '../../data/designData';
 import AnalysisLayer from './AnalysisLayer';
+import AppendixSheet from './AppendixSheet';
+import { APPENDICES } from '../../data/appendices';
 import { sunVector, type Analysis } from '../../analysis/engine';
 import { CONTEXT } from '../../data/contextData';
 import { usePlanStore, useSelection } from '../../store/planStore';
@@ -191,6 +193,7 @@ export default function Viewport3D() {
   const analysis = usePlanStore((s) => s.analysis);
   const setAnalysis = usePlanStore((s) => s.setAnalysis);
   const [gallery, setGallery] = useState(true);
+  const appendix = usePlanStore((s) => s.appendix);
   const real = render === 'real';
   const massMode = usePlanStore((s) => s.massMode);
   const setMassMode = usePlanStore((s) => s.setMassMode);
@@ -245,6 +248,7 @@ export default function Viewport3D() {
         <QuarterModel />
         <PublicLots />
         <AnalysisLayer />
+        <AppendixSheet />
         <PlanLayers />
       </Canvas>
 
@@ -359,7 +363,11 @@ export default function Viewport3D() {
 
       {/* מה מוצג, ומה מקור הגיאומטריה */}
       <div className="pointer-events-none absolute right-3 top-3 hidden max-w-[42%] bg-white/85 px-2 py-1 text-xs text-ink/75 md:block">
-        {analysis ? (
+        {appendix ? (
+          <>
+            <span className="font-semibold">{APPENDICES.find((a) => a.sheet === appendix)?.name}.</span> התשריט פרוש על הקרקע, והמודל מעליו.
+          </>
+        ) : analysis ? (
           <>
             <span className="font-semibold">ניתוח {ANALYSES.find((x) => x.id === analysis)!.name}.</span> מודל מפושט להמחשה, על מעטפות הזכויות.
           </>
