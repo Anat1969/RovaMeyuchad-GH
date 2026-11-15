@@ -152,7 +152,7 @@ export default function Viewport3D() {
       </div>
 
       {/* מה מוצג, ומה מקור הגיאומטריה */}
-      <div className="pointer-events-none absolute right-3 top-3 max-w-[55%] bg-white/85 px-2 py-1 text-xs text-ink/75">
+      <div className="pointer-events-none absolute right-3 top-3 hidden max-w-[55%] bg-white/85 px-2 py-1 text-xs text-ink/75 md:block">
         {development ? (
           <>
             <span className="font-semibold">{topic.nameHe} על רחובות התוכנית.</span> הרחובות אמיתיים. מיקום הרכיבים
