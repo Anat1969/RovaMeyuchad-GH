@@ -1,27 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { completionStats, usePlanStore } from '../../store/planStore';
-import { DECK_URL, PANELS, type PanelId } from '../../data/insights';
+import { DECK_URL } from '../../data/insights';
+import { STAGES } from '../../data/stages';
 import Badge from '../ui/Badge';
-
-const HINT: Record<string, string> = {
-  prep: 'עמדה, פערים ושאלות לישיבה',
-  people: 'התאמה לזקנים ולילדים',
-  metrics: '44 מדדי שכונה 360',
-  appendix: 'נספחים על המודל',
-  status: 'אילו פרקים הוגשו',
-  proscons: 'חוזקות וסיכונים',
-  ideas: 'צעדים לשיפור',
-  work: 'משימות ותאריכים',
-};
-
-const BUTTONS: { id: PanelId; name: string }[] = [
-  ...PANELS.filter((p) => p.id === 'prep' || p.id === 'people').map((p) => ({ id: p.id, name: p.name })),
-  { id: 'metrics', name: 'התאמה למדדים' },
-  { id: 'appendix', name: 'נספחי התב"ע' },
-  { id: 'status', name: 'מה בוצע' },
-  ...PANELS.filter((p) => p.id === 'proscons' || p.id === 'ideas').map((p) => ({ id: p.id, name: p.name })),
-  { id: 'work', name: 'תוכנית עבודה' },
-];
 
 export default function Header() {
   const topics = usePlanStore((s) => s.topics);
@@ -30,7 +11,8 @@ export default function Header() {
   const selectTopic = usePlanStore((s) => s.selectTopic);
   const resetData = usePlanStore((s) => s.resetData);
   const setView = usePlanStore((s) => s.setView);
-  const panel = usePlanStore((s) => s.panel);
+  const stageId = usePlanStore((s) => s.stage);
+  const setStage = usePlanStore((s) => s.setStage);
   const setPanel = usePlanStore((s) => s.setPanel);
   const { total, complete } = completionStats(topics);
   const [open, setOpen] = useState(false);
@@ -60,19 +42,24 @@ export default function Header() {
         <Badge status={complete === total ? 'complete' : 'pending'} label={`${complete} מתוך ${total} נושאים הושלמו`} />
       </span>
 
-      {/* כפתורי התובנות: כל אחד פורס את המידע שלו בשליש המסך, מקושר למודל */}
-      <nav aria-label="תובנות" className="flex min-w-0 flex-1 items-stretch justify-center gap-1 overflow-x-auto">
-        {BUTTONS.map((b) => (
-          <button
-            key={b.id}
-            aria-pressed={panel === b.id}
-            title={HINT[b.id]}
-            onClick={() => setPanel(panel === b.id ? null : b.id)}
-            className={`btn shrink-0 whitespace-nowrap px-2.5 py-2 text-sm ${panel === b.id ? 'btn-on shadow-md' : ''}`}
-          >
-            {b.name}
-          </button>
-        ))}
+      {/* ארבעת שלבי העבודה. כל שלב פותח בסרגל שמתחת את הכלים שלו */}
+      <nav aria-label="שלבי העבודה" className="flex min-w-0 flex-1 items-stretch justify-center gap-1 overflow-x-auto">
+        {STAGES.map((st) => {
+          const on = st.id === stageId;
+          return (
+            <button
+              key={st.id}
+              aria-pressed={on}
+              title={st.hint}
+              onClick={() => setStage(st.id)}
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-2 text-sm transition-shadow ${on ? 'font-semibold text-white shadow-md' : 'bg-ink/[0.05] hover:bg-ink/[0.1]'}`}
+              style={on ? { background: st.color } : { boxShadow: `inset 0 -3px 0 ${st.color}` }}
+            >
+              <span className={`text-lg font-light leading-none ${on ? 'text-white/70' : 'text-ink/40'}`}>{st.id}</span>
+              {st.name}
+            </button>
+          );
+        })}
       </nav>
 
       <a

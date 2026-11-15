@@ -4,6 +4,7 @@ import { Html, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { QUARTER } from '../../data/quarterData';
 import type { QuarterLot } from '../../types/plan';
+import { tY } from '../../analysis/terrain';
 import { usePlanStore } from '../../store/planStore';
 import { FLOOR, facadeTextures } from './facades';
 import { DESIGNS } from '../../data/designData';
@@ -126,6 +127,8 @@ function Lot({ lot, real }: { lot: QuarterLot; real: boolean }) {
   const cPodium = legend[2]?.color ?? '#8E8A93';
 
   const c = useMemo(() => centroid(lot.ring), [lot]);
+  // המגרש יושב על מפלס הקרקע שבמרכזו
+  const ty = useMemo(() => tY(c[0], c[1]), [c]);
   const tower = useMemo(() => footprint(lot.ring, c, lot.mixed ? TOWER_COVERAGE : lot.coverage), [lot, c]);
   const crown = useMemo(() => footprint(tower, c, 74), [tower, c]);
   const podium = useMemo(() => (lot.mixed ? footprint(lot.ring, c, lot.coverage) : null), [lot, c]);
@@ -138,7 +141,7 @@ function Lot({ lot, real }: { lot: QuarterLot; real: boolean }) {
   // מודל התכנון: המסות של האדריכל אם הועלו, ואם לא, רק קו המעטפת המותרת
   if (massMode === 'design') {
     return (
-      <group>
+      <group position={[0, ty, 0]}>
         {!real && <Solid ring={lot.ring} base={0.05} height={0} color={lot.mixed ? cMixed : cRes} opacity={0.3} onClick={pick} />}
         {!real && <Line points={flat(lot.ring, 0.2)} color={isSel ? '#2E2E2B' : '#B9895A'} lineWidth={isSel ? 3 : 1} />}
         {design ? (
@@ -156,7 +159,7 @@ function Lot({ lot, real }: { lot: QuarterLot; real: boolean }) {
     const tex = facadeTextures();
     const skin = lot.mixed ? tex.mixed : tex.stone;
     return (
-      <group>
+      <group position={[0, ty, 0]}>
         {podium && <Solid ring={podium} base={0.1} height={PODIUM_H} color="#fff" opacity={1} facade={tex.shop} onClick={pick} />}
         <Solid ring={tower} base={towerBase} height={towerH - SETBACK_H} color="#fff" opacity={1} facade={skin} onClick={pick} />
         <Solid ring={crown} base={towerBase + towerH - SETBACK_H} height={SETBACK_H} color="#fff" opacity={1} facade={skin} onClick={pick} />
@@ -173,7 +176,7 @@ function Lot({ lot, real }: { lot: QuarterLot; real: boolean }) {
   const useIdx = lot.mixed ? 1 : 0;
 
   return (
-    <group>
+    <group position={[0, ty, 0]}>
       {!sheetOn && <Solid ring={lot.ring} base={0.05} height={0} color={lot.mixed ? cMixed : cRes} opacity={0.35 * fade(useIdx) + 0.1} onClick={pick} />}
       <Line points={flat(lot.ring, 0.2)} color={isSel ? '#2E2E2B' : '#B9895A'} lineWidth={isSel ? 3 : 1} />
       {podium && <Solid ring={podium} base={0.1} height={PODIUM_H} color={cPodium} opacity={fade(2)} onClick={pick} />}

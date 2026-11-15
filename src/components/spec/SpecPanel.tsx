@@ -1,6 +1,7 @@
 import { usePlanStore, useSelection } from '../../store/planStore';
 import type { SpecItem } from '../../types/plan';
 import SpecEmpty from './SpecEmpty';
+import StageIntro from './StageIntro';
 import SpecHeader from './SpecHeader';
 import SpecLegend from './SpecLegend';
 import SpecPending from './SpecPending';
@@ -17,6 +18,8 @@ import MetricsPanel from '../insight/MetricsPanel';
 import AnalysisPanel from '../insight/AnalysisPanel';
 import AppendixPanel from '../insight/AppendixPanel';
 import SectionPanel from '../insight/SectionPanel';
+import DiffPanel from '../insight/DiffPanel';
+import SendPanel from '../insight/SendPanel';
 
 export default function SpecPanel() {
   const { topic, item } = useSelection();
@@ -26,6 +29,7 @@ export default function SpecPanel() {
   const addItem = usePlanStore((s) => s.addItem);
   const panel = usePlanStore((s) => s.panel);
   const analysis = usePlanStore((s) => s.analysis);
+  const stageId = usePlanStore((s) => s.stage);
 
   const newItem = () => {
     if (!topic) return;
@@ -51,6 +55,10 @@ export default function SpecPanel() {
         <AppendixPanel />
       ) : panel === 'section' ? (
         <SectionPanel />
+      ) : panel === 'diff' ? (
+        <DiffPanel />
+      ) : panel === 'send' ? (
+        <SendPanel />
       ) : panel === 'status' ? (
         <StatusPanel />
       ) : panel === 'work' ? (
@@ -60,7 +68,7 @@ export default function SpecPanel() {
       ) : panel ? (
         <InsightPanelView key={panel} id={panel} />
       ) : !topic || !item ? (
-        <SpecEmpty />
+        stageId === 3 ? <SpecEmpty /> : <StageIntro />
       ) : (
         <div key={topic.id} className="fade-in">
           <div className="mb-4 flex items-center gap-2">

@@ -6,6 +6,7 @@ import { PUBLIC } from '../data/publicData';
 const PUBLIC_NUMS = new Set(PUBLIC.lots.map((l) => l.num));
 import { PLAN_TOPICS, withAlternative } from '../data/planData';
 import { SEED_TASKS, type Go, type PanelId } from '../data/insights';
+import { stageOf, type StageId } from '../data/stages';
 import type { Analysis, Params } from '../analysis/engine';
 
 /** משימה בתוכנית העבודה */
@@ -43,6 +44,10 @@ interface PlanState {
   renderMode: RenderMode;
   massMode: MassMode; // מודל הזכויות, או מודל התכנון של האדריכל
   panel: PanelId | null; // לוח התובנות שפתוח בצד
+  stage: StageId; // שלב העבודה: תב"ע, צרכים, תכנון, הערות
+  setStage: (s: StageId) => void;
+  terrain: boolean; // המודל יושב על הטופוגרפיה
+  setTerrain: (b: boolean) => void;
   tasks: WorkTask[];
   lightbox: string | null;
   analysis: Analysis | null; // כלי הניתוח הפעיל: הצללות, רוח, ניקוז או חום
@@ -105,6 +110,11 @@ export const usePlanStore = create<PlanState>()(
       renderMode: 'model',
       massMode: 'rights',
       panel: null,
+      stage: 1,
+      // מעבר שלב מנקה את מה שהיה פתוח, כדי שהמסך יציג רק את השלב החדש
+      setStage: (st) => set({ stage: st, panel: null, analysis: null, appendix: null, selectedTopicId: null, selectedItemId: null, selectedLot: null, legendFocus: null }),
+      terrain: true,
+      setTerrain: (b) => set({ terrain: b }),
       tasks: seedTasks(),
       lightbox: null,
       analysis: null,
@@ -260,7 +270,7 @@ export const usePlanStore = create<PlanState>()(
         }
         return s as never;
       },
-      partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode, renderMode: s.renderMode, massMode: s.massMode, tasks: s.tasks }),
+      partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode, renderMode: s.renderMode, massMode: s.massMode, tasks: s.tasks, stage: s.stage }),
     },
   ),
 );
@@ -279,3 +289,9 @@ export function useSelection() {
 export function completionStats(topics: PlanTopic[]) {
   return { total: topics.length, complete: topics.filter((t) => t.status === 'complete').length };
 }
+
+// השלב עוקב אחרי מה שמוצג: בחירת נושא, לוח או ניתוח מכל מקום מעבירה לשלב שלו
+usePlanStore.subscribe((s) => {
+  const st = stageOf(s);
+  if (st && st !== s.stage) usePlanStore.setState({ stage: st });
+});

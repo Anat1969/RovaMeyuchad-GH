@@ -7,12 +7,13 @@ import PlanLayers from './PlanLayers';
 import ContextLayer from './ContextLayer';
 import PublicLots from './PublicLots';
 import { IconBtn } from '../ui/Icon';
+import Tag from '../ui/Tag';
 import { DESIGNS } from '../../data/designData';
 import AnalysisLayer from './AnalysisLayer';
 import AppendixSheet from './AppendixSheet';
 import ExistingTrees from './ExistingTrees';
 import FunnelVolume from './FunnelVolume';
-import { APPENDICES } from '../../data/appendices';
+import { APPENDICES, LAYER_STEPS } from '../../data/appendices';
 import { sunVector, type Analysis } from '../../analysis/engine';
 import { CONTEXT } from '../../data/contextData';
 import { usePlanStore, useSelection } from '../../store/planStore';
@@ -193,7 +194,6 @@ export default function Viewport3D() {
   const lightbox = usePlanStore((s) => s.lightbox);
   const setLightbox = usePlanStore((s) => s.setLightbox);
   const analysis = usePlanStore((s) => s.analysis);
-  const setAnalysis = usePlanStore((s) => s.setAnalysis);
   const [gallery, setGallery] = useState(true);
   const appendix = usePlanStore((s) => s.appendix);
   const real = render === 'real';
@@ -286,21 +286,6 @@ export default function Viewport3D() {
         )}
       </div>
 
-      {/* כלי הניתוח: מפה על הקרקע, תנועה על המודל, והמלצות בלוח */}
-      <div className="no-print absolute left-14 top-3 flex gap-1 bg-white/90 p-1 shadow-md" role="group" aria-label="כלי ניתוח">
-        {ANALYSES.map((x) => (
-          <button
-            key={x.id}
-            title={x.hint}
-            aria-pressed={analysis === x.id}
-            onClick={() => setAnalysis(analysis === x.id ? null : x.id)}
-            className={`btn w-16 px-1 py-1.5 text-xs ${analysis === x.id ? 'btn-on' : ''}`}
-          >
-            {x.name}
-          </button>
-        ))}
-      </div>
-
       {/* שכבת הסימון של כלי הזום למלבן */}
       {boxMode && (
         <div
@@ -369,32 +354,32 @@ export default function Viewport3D() {
       )}
 
       {/* מה מוצג, ומה מקור הגיאומטריה */}
-      <div className="pointer-events-none absolute right-3 top-3 hidden max-w-[42%] bg-white/85 px-2 py-1 text-xs text-ink/75 md:block">
+      <div className="pointer-events-none absolute right-3 top-3 hidden max-w-[46%] bg-white/90 px-2 py-1 text-xs leading-relaxed text-ink/80 md:block">
         {appendix ? (
           <>
-            <span className="font-semibold">{APPENDICES.find((a) => a.sheet === appendix)?.name}.</span> התשריט פרוש על הקרקע, והמודל מעליו.
+            <Tag s={1} /> <span className="font-semibold">{LAYER_STEPS.find((l) => l.sheet === appendix)?.name ?? APPENDICES.find((a) => a.sheet === appendix)?.name}.</span> התשריט מונח על הקרקע, והמודל
+            מעליו. <span className="text-ink/60">מקור: {LAYER_STEPS.find((l) => l.sheet === appendix)?.src}.</span>
           </>
         ) : analysis ? (
           <>
-            <span className="font-semibold">ניתוח {ANALYSES.find((x) => x.id === analysis)!.name}.</span> מודל מפושט להמחשה, על מעטפות הזכויות.
+            <Tag s={2} /> <span className="font-semibold">ניתוח {ANALYSES.find((x) => x.id === analysis)!.name}.</span> מודל מפושט להמחשה.{' '}
+            <span className="text-ink/60">מקור: חישוב באפליקציה, על מעטפות הזכויות ועל הטופוגרפיה.</span>
           </>
         ) : massMode === 'design' ? (
           <>
-            <span className="font-semibold">מודל התכנון.</span> הועלו מודלי אדריכל ל-{DESIGNS.length} מגרשים. לשאר מוצג קו המעטפת המותרת בלבד.
-          </>
-        ) : real ? (
-          <>
-            <span className="font-semibold">מודל הזכויות, בהדמיה ריאליסטית.</span> גובה, תכסית ונסיגת הקומות העליונות לפי התכנית. החזיתות
-            גנריות, ופרקים חסרים מוצגים באפור.
+            <Tag s={3} /> <span className="font-semibold">מודל התכנון.</span> הועלו מודלי אדריכל ל-{DESIGNS.length} מגרשים. לשאר מוצג קו המעטפת המותרת בלבד.
           </>
         ) : development ? (
           <>
-            <span className="font-semibold">{topic.nameHe} על רחובות התוכנית.</span> הרחובות אמיתיים. מיקום הרכיבים
-            לאורכם סכמטי.
+            <Tag s={3} /> <span className="font-semibold">{topic.nameHe} על רחובות התוכנית.</span> מיקום הרכיבים לאורך הרחוב סכמטי.{' '}
+            <span className="text-ink/60">מקור: מצגת שפת רחוב ושצ"פ. מרווחים: אוגדן שפת הרחוב ואוגדן ההנחיות להיתר. עצים קיימים: נספח העצים.</span>
           </>
         ) : (
           <>
-            <span className="font-semibold">מודל הזכויות.</span> כל מסה היא המעטפת המרבית שהתב"ע מתירה: מגורים, ציבור, חינוך ומסחר.
+            <Tag s={1} /> <span className="font-semibold">מודל הזכויות{real ? ', בהדמיה ריאליסטית' : ''}.</span> כל מסה היא המעטפת המרבית שהתב"ע מתירה.{' '}
+            <span className="text-ink/60">
+              מקור: קובצי תכנית 603-0811588 והוראות 3/124/03/3. טופוגרפיה: SRTM ומפלסי נספח הניקוז. עצים לשימור: נספח העצים.{real ? ' החזיתות גנריות.' : ''}
+            </span>
           </>
         )}
       </div>

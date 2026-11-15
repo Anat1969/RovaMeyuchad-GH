@@ -1,4 +1,4 @@
-import { APPENDICES } from '../../data/appendices';
+import { APPENDICES, DOC_ORDER, LAYER_STEPS } from '../../data/appendices';
 import { usePlanStore } from '../../store/planStore';
 import PanelShell from './PanelShell';
 import { IconBtn } from '../ui/Icon';
@@ -11,15 +11,51 @@ export default function AppendixPanel() {
   const setView = usePlanStore((s) => s.setView);
   const go = usePlanStore((s) => s.go);
   const withSheet = APPENDICES.filter((a) => a.sheet).length;
+  const topicId = usePlanStore((s) => s.selectedTopicId);
+  const docs = [...APPENDICES].sort((a, b) => DOC_ORDER.indexOf(a.id) - DOC_ORDER.indexOf(b.id));
+  // השכבה הפעילה: תשריט שפרוש, או שכבת מודל שנבחרה
+  const stepOn = LAYER_STEPS.findIndex((l) => (active ? l.sheet === active : !!l.topic && l.topic === topicId));
+  const pick = (i: number) => {
+    const l = LAYER_STEPS[i];
+    go({ topic: l?.topic ?? null });
+    setAppendix(l?.sheet ?? null);
+  };
 
   return (
     <PanelShell
-      name='נספחי התב"ע'
+      name='שכבות התב"ע'
       title={`${APPENDICES.length} מסמכים, ${withSheet} מהם נפרשים על המודל`}
       lead="לכל נספח: מה הוא קובע, על מה לשים לב בתכנון, והמסמך המקורי. תשריט נפרש על הקרקע במקומו, והמודל התלת-ממדי נשאר מעליו."
     >
-      <ol className="mt-4 space-y-2">
-        {APPENDICES.map((a, i) => {
+      <section className="no-print mt-4 bg-ink/[0.03] p-3">
+        <h3 className="text-sm font-semibold">בניית המודל, שכבה שכבה</h3>
+        <ol className="mt-2 grid grid-cols-3 gap-1">
+          {LAYER_STEPS.map((l, i) => (
+            <li key={l.name}>
+              <button title={l.what} aria-pressed={i === stepOn} onClick={() => pick(i === stepOn ? -1 : i)} className={`btn flex w-full items-center gap-1 px-1.5 py-1.5 text-xs ${i === stepOn ? 'btn-on' : ''}`}>
+                <span className="opacity-50">{i + 1}</span>
+                <span className="truncate">{l.name}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+        {stepOn >= 0 ? (
+          <div className="mt-2 flex items-start gap-2">
+            <div className="min-w-0 flex-1 text-sm leading-relaxed">
+              <span className="font-semibold">{LAYER_STEPS[stepOn].name}.</span> {LAYER_STEPS[stepOn].what}
+              <span className="block text-xs text-ink/50">מקור: {LAYER_STEPS[stepOn].src}.</span>
+            </div>
+            <IconBtn icon="prev" label="השכבה הקודמת" disabled={stepOn === 0} onClick={() => pick(stepOn - 1)} />
+            <IconBtn icon="next" label="השכבה הבאה" disabled={stepOn === LAYER_STEPS.length - 1} onClick={() => pick(stepOn + 1)} />
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-ink/60">בוחרים שכבה, והיא מוצגת על המודל עם המקור שלה. החצים עוברים לשכבה הבאה.</p>
+        )}
+      </section>
+
+      <h3 className="mt-5 text-lg font-semibold">המסמכים</h3>
+      <ol className="mt-2 space-y-2">
+        {docs.map((a, i) => {
           const on = active === a.sheet && !!a.sheet;
           return (
             <li key={a.id} className={`grid grid-cols-[2.2rem_1fr] gap-x-2 p-3 ${on ? 'bg-[#F4E9A8]/50' : 'bg-ink/[0.03]'}`}>

@@ -4,7 +4,8 @@ import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { CONTEXT } from '../../data/contextData';
 import { usePlanStore } from '../../store/planStore';
-import { pushRibbon, ribbonGeometry, type Pt } from './geometry';
+import { ribbonGeometry, type Pt } from './geometry';
+import { densify, drapedQuad, groundGeometry, pushRibbonT, tY } from '../../analysis/terrain';
 
 const TILE_URL = (z: number, x: number, y: number) =>
   `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
@@ -14,14 +15,8 @@ const TILE_Y: Record<number, number> = { 14: -1.2, 16: -0.8, 18: -0.4 };
 function Tile({ z, x, y, c, lit }: { z: number; x: number; y: number; c: Pt[]; lit: boolean }) {
   const [map, setMap] = useState<THREE.Texture | null>(null);
   const geo = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    const h = TILE_Y[z] ?? -1;
-    // הפינות: צפון-מערב, צפון-מזרח, דרום-מזרח, דרום-מערב
-    g.setAttribute('position', new THREE.Float32BufferAttribute(c.flatMap(([px, py]) => [px, h, -py]), 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 0], 2));
-    g.setIndex([0, 3, 2, 0, 2, 1]);
-    g.computeVertexNormals();
-    return g;
+    // הפינות: צפון-מערב, צפון-מזרח, דרום-מזרח, דרום-מערב. האריח מחולק ומונח על הקרקע
+    return drapedQuad(c, TILE_Y[z] ?? -1, z >= 18 ? 40 : 64);
   }, [z, c]);
 
   useEffect(() => {
@@ -54,7 +49,7 @@ function Streets({ satellite }: { satellite: boolean }) {
   const [main, minor] = useMemo(() => {
     const a: number[] = [];
     const b: number[] = [];
-    for (const s of CONTEXT.streets) for (const line of s.l) pushRibbon(s.w >= 14 ? a : b, line, s.w, s.w >= 14 ? 0.06 : 0.04);
+    for (const s of CONTEXT.streets) for (const line of s.l) pushRibbonT(s.w >= 14 ? a : b, densify(line as Pt[]), s.w, s.w >= 14 ? 0.06 : 0.04);
     return [ribbonGeometry(a), ribbonGeometry(b)];
   }, []);
   return (
@@ -177,7 +172,7 @@ function StreetNames({ satellite }: { satellite: boolean }) {
         if (band === 'far' || (band === 'mid' && !l.major)) return null;
         const h = band === 'mid' ? 44 : l.major ? 13 : 8;
         return (
-          <group key={l.n} position={[l.p[0], 0.7, -l.p[1]]} rotation={[0, l.angle, 0]}>
+          <group key={l.n} position={[l.p[0], 0.9 + tY(l.p[0], l.p[1]), -l.p[1]]} rotation={[0, l.angle, 0]}>
             <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
               <planeGeometry args={[h * l.ratio, h]} />
               <meshBasicMaterial map={l.t} transparent depthWrite={false} toneMapped={false} />
@@ -209,13 +204,16 @@ function QuarterNames({ satellite }: { satellite: boolean }) {
         <span className="whitespace-nowrap bg-[#D98A3D] px-1.5 py-0.5 text-xs font-semibold text-white">הרובע המיוחד</span>
       </Html>
       {CONTEXT.quarters.map((q) => (
-        <Html key={q.id} position={[q.c[0], 2, -q.c[1]]} center zIndexRange={[4, 0]} style={{ pointerEvents: 'none' }}>
+        <Html key={q.id} position={[q.c[0], 2 + tY(q.c[0], q.c[1]), -q.c[1]]} center zIndexRange={[4, 0]} style={{ pointerEvents: 'none' }}>
           <span className={`whitespace-nowrap px-1.5 py-0.5 text-xs font-semibold ${chip}`}>{q.name}</span>
         </Html>
       ))}
     </group>
   );
 }
+
+/** פני הקרקע: הטופוגרפיה, מתחת לכל שאר השכבות */
+const GROUND = groundGeometry(-2);
 
 export default function ContextLayer() {
   const chosen = usePlanStore((s) => s.contextMode);
@@ -224,8 +222,7 @@ export default function ContextLayer() {
   const mode = real ? 'satellite' : chosen;
   if (mode === 'none') {
     return (
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
-        <planeGeometry args={[60000, 60000]} />
+      <mesh geometry={GROUND}>
         <meshBasicMaterial color="#F5F0EB" />
       </mesh>
     );
@@ -233,8 +230,7 @@ export default function ContextLayer() {
   const satellite = mode === 'satellite';
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
-        <planeGeometry args={[60000, 60000]} />
+      <mesh geometry={GROUND}>
         <meshBasicMaterial color={satellite ? '#C9BFAE' : '#EAE4DA'} />
       </mesh>
       {satellite && CONTEXT.tiles.map((t) => <Tile key={`${t.z}/${t.x}/${t.y}`} {...t} lit={real} />)}

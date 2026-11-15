@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { groundExisting } from '../../analysis/engine';
+import { REF, tY } from '../../analysis/terrain';
 import { FUNNEL_TOTAL, HELI, allowedLevel, halfWidth } from '../../data/heliData';
 import { usePlanStore } from '../../store/planStore';
 
@@ -21,8 +21,8 @@ export default function FunnelVolume() {
         for (const side of [-1, 1]) {
           const x = HELI.pad[0] + ax * dir * (HELI.half + s) + nx * side * hw;
           const y = HELI.pad[1] + ay * dir * (HELI.half + s) + ny * side * hw;
-          // גובה מעל פני הקרקע של המודל, שהם שטוחים
-          pos.push(x, Math.max(0.5, allowedLevel(s) - groundExisting(x, y)), -y);
+          // המפלס המוחלט של המשפך, באותו בסיס גובה של הטופוגרפיה
+          pos.push(x, allowedLevel(s) - REF, -y);
         }
         if (k) idx.push(base + 2 * k - 2, base + 2 * k - 1, base + 2 * k, base + 2 * k - 1, base + 2 * k + 1, base + 2 * k);
       }
@@ -43,7 +43,7 @@ export default function FunnelVolume() {
       <lineSegments geometry={edges}>
         <lineBasicMaterial color="#8E2A1F" transparent opacity={0.5} />
       </lineSegments>
-      <mesh position={[HELI.pad[0], 1.5, -HELI.pad[1]]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh position={[HELI.pad[0], 1.5 + tY(HELI.pad[0], HELI.pad[1]), -HELI.pad[1]]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[9, 12, 32]} />
         <meshBasicMaterial color="#8E2A1F" side={THREE.DoubleSide} />
       </mesh>

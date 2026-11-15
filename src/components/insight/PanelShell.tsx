@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { usePlanStore } from '../../store/planStore';
 import { IconBtn } from '../ui/Icon';
+import Tag from '../ui/Tag';
 
 /**
  * מעטפת לכל לוח תובנות: כותרת, פעולות (הדפסה, העתקה, מייל) ותוכן.
@@ -20,6 +21,7 @@ export default function PanelShell({
   onClose?: () => void;
 }) {
   const setPanel = usePlanStore((s) => s.setPanel);
+  const stageId = usePlanStore((s) => s.stage);
   const body = useRef<HTMLDivElement>(null);
   const [msg, setMsg] = useState('');
 
@@ -52,7 +54,9 @@ export default function PanelShell({
   return (
     <div className="fade-in">
       <div className="no-print mb-3 flex flex-wrap items-center gap-1">
-        <span className="flex-1 text-sm font-semibold">{name}</span>
+        <span className="flex-1 text-sm font-semibold">
+          <Tag s={stageId} /> {name}
+        </span>
         <IconBtn icon="print" label="הדפסה" onClick={() => window.print()} />
         <IconBtn icon="copy" label="העתקה" onClick={copy} />
         <IconBtn icon="mail" label="שליחה במייל" onClick={mail} />

@@ -4,7 +4,10 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { CONTEXT } from '../../data/contextData';
 import { ROUND, ROUNDABOUTS } from '../../data/junctions';
 import { usePlanStore } from '../../store/planStore';
-import { headings, offsetLine, pushRibbon, ribbonGeometry, type Pt } from './geometry';
+import { headings, offsetLine, ribbonGeometry, type Pt } from './geometry';
+import { pushRibbonT as pushRibbon, tY } from '../../analysis/terrain';
+import { EXISTING_TREES } from '../../data/existingTrees';
+import { RULES } from '../../data/rules';
 import { resolveStyle, type PieceRef } from './layerStyle';
 
 /**
@@ -54,6 +57,7 @@ interface Junction {
   round: boolean;
 }
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const KEEP: Pt[] = EXISTING_TREES.filter((t) => t[2] === 'keep').map((t) => [t[0], t[1]]);
 
 /** מאתר צמתים: חיתוך בין שני רחובות, או קצה של רחוב שנפגש ברחוב אחר בזווית */
 function findJunctions(): Junction[] {
@@ -126,7 +130,10 @@ function pushDisc(out: number[], c: Pt, r0: number, r1: number, y: number) {
   for (let k = 0; k < N; k++) {
     const a = (k / N) * Math.PI * 2;
     const b = ((k + 1) / N) * Math.PI * 2;
-    const p = (r: number, t: number) => [c[0] + Math.cos(t) * r, y, -(c[1] + Math.sin(t) * r)];
+    const p = (r: number, t: number) => {
+      const [px, py] = [c[0] + Math.cos(t) * r, c[1] + Math.sin(t) * r];
+      return [px, y + tY(px, py), -py];
+    };
     out.push(...p(r1, a), ...p(r1, b), ...p(r0, b));
     if (r0 > 0) out.push(...p(r1, a), ...p(r0, b), ...p(r0, a));
   }
@@ -141,7 +148,7 @@ function build() {
   const put = (ref: PieceRef, shape: Shape, at: Pt, y: number, s: Inst['s'], r = 0) => {
     const k = key(ref, shape);
     if (!inst.has(k)) inst.set(k, { ...ref, shape, list: [] });
-    inst.get(k)!.list.push({ p: [at[0], y, -at[1]], s, r });
+    inst.get(k)!.list.push({ p: [at[0], y + tY(at[0], at[1]), -at[1]], s, r });
   };
   // רכיב רחוב רגיל אינו מוצב בתוך צומת
   const add = (ref: PieceRef, shape: Shape, at: Pt, y: number, s: Inst['s'], r = 0) => {
@@ -207,6 +214,8 @@ function build() {
       const seats = at(5.4);
       swale.forEach((p, i) => {
         const shift = side > 0 ? 0 : 1;
+        // עץ קיים לשימור גובר: לא נוטעים עץ חדש קרוב אליו מהמרחק שבאוגדן ההיתר
+        if (KEEP.some((k) => dist(k, p) < RULES.ogdanTree.v)) return;
         // פתח נטיעה מלבני, 1.2 על 2.4 מ' (המינימום בהוראות התכנית), ועץ בכל 6 מ'
         add({ layer: 'planting-pits', item: 'pits-main', idx: 0 }, 'box', p, 0.2, [2.4, 0.08, 1.2], ang[i]);
         const kind = (i + ri + shift) % 3;
@@ -348,7 +357,9 @@ function Ribbon({ g }: { g: RibbonGroup }) {
 export default function PlanLayers() {
   const { inst, ribbons } = useMemo(build, []);
   const sheetOn = usePlanStore((s) => s.appendix) !== null;
-  if (sheetOn) return null;
+  // בשלב התב"ע מוצג רק המידע הסטטוטורי. שכבות הפיתוח הן תכנון האדריכל
+  const statutory = usePlanStore((s) => s.stage) === 1;
+  if (sheetOn || statutory) return null;
   return (
     <group>
       {ribbons.map((g, i) => (

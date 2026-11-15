@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { drapedPlane } from '../../analysis/terrain';
 import * as THREE from 'three';
 import { SHEETS } from '../../data/appendixGeo';
 import { usePlanStore } from '../../store/planStore';
@@ -23,13 +24,12 @@ export default function AppendixSheet() {
     };
   }, [sheet]);
   useEffect(() => () => tex?.dispose(), [tex]);
+  // התשריט מונח על הטופוגרפיה, במקומו ובזווית שלו
+  const geo = useMemo(() => (sheet ? drapedPlane(sheet.cx, sheet.cy, sheet.w, sheet.h, sheet.angle, 1) : null), [sheet]);
   if (!sheet || !tex) return null;
   return (
-    <group position={[sheet.cx, 1, -sheet.cy]} rotation={[0, -sheet.angle, 0]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={3}>
-        <planeGeometry args={[sheet.w, sheet.h]} />
-        <meshBasicMaterial map={tex} toneMapped={false} depthWrite={false} />
-      </mesh>
-    </group>
+    <mesh geometry={geo!} renderOrder={3}>
+      <meshBasicMaterial map={tex} toneMapped={false} depthWrite={false} />
+    </mesh>
   );
 }

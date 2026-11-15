@@ -392,6 +392,8 @@ export const designShift = () => DESIGN_LEVELS.reduce((s, [x, y, z]) => s + Math
 const cellAt = (i: number, j: number) => HGT[j * DEM.nx + i];
 /** גובה הקרקע בנקודה, באינטרפולציה, על המשטח שנבחר */
 export const ground = (x: number, y: number) => bilinear(HGT, x, y);
+/** גובה הקרקע המתוכננת בנקודה, בלי תלות במשטח שנבחר לניקוז */
+export const groundDesign = (x: number, y: number) => bilinear(designSurface(), x, y);
 /** גובה הקרקע הקיימת בנקודה */
 export const groundExisting = (x: number, y: number) => bilinear(DEM.h, x, y);
 /** כיוון הירידה והשיפוע בנקודה */

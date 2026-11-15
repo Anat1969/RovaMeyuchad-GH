@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { drapedPlane, tY } from '../../analysis/terrain';
+import { DESIGN_LEVELS } from '../../data/designLevels';
+import { Html } from '@react-three/drei';
 import { usePlanStore } from '../../store/planStore';
 import { H, W, X0, Y1, buildingMask, downhill, flowAt, ground, mapCanvas, setSurface, windField, windTo } from '../../analysis/engine';
 
 const PW = Math.round(W);
 const PH = Math.round(H);
+
+const PLANE = drapedPlane(X0 + W / 2, Y1 - H / 2, W, H, 0, 0.9);
 
 /** מפת הניתוח, פרושה על הקרקע */
 function MapPlane() {
@@ -21,8 +26,7 @@ function MapPlane() {
   }, [a, p.season, p.windFrom, p.day, p.design, a === 'shade' && !p.day ? p.hour : 0]);
   useEffect(() => () => tex.dispose(), [tex]);
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[X0 + W / 2, 0.9, -(Y1 - H / 2)]} renderOrder={3}>
-      <planeGeometry args={[W, H]} />
+    <mesh geometry={PLANE} renderOrder={3}>
       <meshBasicMaterial map={tex} transparent opacity={a === 'shade' && !p.day ? 1 : 0.86} depthWrite={false} toneMapped={false} />
     </mesh>
   );
@@ -90,10 +94,10 @@ function Particles({ kind }: { kind: 'wind' | 'water' }) {
       const h = kind === 'wind' ? 4 : 1.6;
       const tail = kind === 'wind' ? 0.22 : 0.5;
       pos[i * 6] = nx;
-      pos[i * 6 + 1] = h;
+      pos[i * 6 + 1] = h + tY(nx, ny);
       pos[i * 6 + 2] = -ny;
       pos[i * 6 + 3] = nx - vx * tail;
-      pos[i * 6 + 4] = h;
+      pos[i * 6 + 4] = h + tY(nx, ny);
       pos[i * 6 + 5] = -(ny - vy * tail);
     }
     geo.attributes.position.needsUpdate = true;
@@ -123,7 +127,7 @@ function Contours() {
           const e2 = (a - lvl) * (c - lvl) < 0 ? [x, y + (step * (lvl - a)) / (c - a)] : null;
           const e3 = (b - lvl) * (c - lvl) < 0 ? [x + step - (step * (lvl - b)) / (c - b), y + (step * (lvl - b)) / (c - b)] : null;
           const e = [e1, e2, e3].filter(Boolean) as number[][];
-          if (e.length === 2) pts.push(e[0][0], 1.2, -e[0][1], e[1][0], 1.2, -e[1][1]);
+          if (e.length === 2) pts.push(e[0][0], 1.2 + tY(e[0][0], e[0][1]), -e[0][1], e[1][0], 1.2 + tY(e[1][0], e[1][1]), -e[1][1]);
         }
       }
     }
@@ -138,11 +142,39 @@ function Contours() {
   );
 }
 
+/** מפלסי התכנון של הרחובות, כתוויות במקומן. המקור: נספח הניקוז של 3/124/03/3 */
+function LevelLabels() {
+  return (
+    <group>
+      {DESIGN_LEVELS.map(([x, y, z], i) => (
+        <Html key={i} position={[x, tY(x, y) + 3, -y]} center zIndexRange={[4, 0]} style={{ pointerEvents: 'none' }}>
+          <span className="whitespace-nowrap bg-[#0B3C8C] px-1 text-[0.65rem] font-semibold text-white" dir="ltr">
+            +{z.toFixed(2)}
+          </span>
+        </Html>
+      ))}
+    </group>
+  );
+}
+
 export default function AnalysisLayer() {
   const a = usePlanStore((s) => s.analysis);
+  const appendix = usePlanStore((s) => s.appendix);
+  const design = usePlanStore((s) => s.analysisParams.design);
+  // על נספחי הניקוז והגבהים: המפלסים במקומם, והנגר זורם על מפלסי התכנון
+  if (!a && (appendix === 'drain' || appendix === 'levels')) {
+    setSurface(true);
+    return (
+      <group>
+        <LevelLabels />
+        {appendix === 'drain' && <Particles kind="water" />}
+      </group>
+    );
+  }
   if (!a) return null;
   return (
     <group>
+      {a === 'water' && design && <LevelLabels />}
       <MapPlane />
       {a === 'wind' && <Particles kind="wind" />}
       {a === 'water' && <Particles kind="water" />}
