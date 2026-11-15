@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CONTEXT } from '../../data/contextData';
 import { usePlanStore } from '../../store/planStore';
 import { headings, offsetLine, pushRibbon, ribbonGeometry, type Pt } from './geometry';
@@ -25,6 +26,16 @@ interface RibbonGroup extends PieceRef {
   positions: number[];
 }
 
+/** נוף עץ ריאליסטי: שלושה גושים חופפים במקום כדור אחד */
+const CROWN = (() => {
+  const blob = (x: number, y: number, z: number, r: number) => {
+    const g = new THREE.IcosahedronGeometry(r, 1);
+    g.translate(x, y, z);
+    return g;
+  };
+  return mergeGeometries([blob(0, 0, 0, 0.82), blob(0.5, 0.18, 0.22, 0.6), blob(-0.42, 0.1, -0.34, 0.66), blob(0.05, 0.42, -0.1, 0.56)])!;
+})();
+
 const GEO: Record<Shape, THREE.BufferGeometry> = {
   box: new THREE.BoxGeometry(1, 1, 1),
   sphere: new THREE.SphereGeometry(1, 12, 8),
@@ -49,6 +60,7 @@ function build() {
 
   CONTEXT.planRuns.forEach((run, ri) => {
     const half = run.w / 2;
+    strip({ layer: 'road', item: 'road', fixed: '#5B5C5F' }, run.pts, run.w, 0.08);
     const ang = headings(run.pts);
     for (const side of [1, -1]) {
       const at = (d: number) => offsetLine(run.pts, side * (half + d));
@@ -107,12 +119,15 @@ function build() {
   return { inst: [...inst.values()], ribbons: [...ribbons.values()] };
 }
 
+const useReal = () => usePlanStore((s) => s.renderMode) === 'real';
+
 function useStyle(ref: PieceRef) {
+  const real = useReal();
   const topics = usePlanStore((s) => s.topics);
   const topicId = usePlanStore((s) => s.selectedTopicId);
   const itemId = usePlanStore((s) => s.selectedItemId);
   const focus = usePlanStore((s) => s.legendFocus);
-  return resolveStyle(ref, topics, topicId, itemId, focus);
+  return resolveStyle(ref, topics, topicId, itemId, focus, real);
 }
 
 function pick(ref: PieceRef) {
@@ -123,24 +138,35 @@ function pick(ref: PieceRef) {
 function Instances({ g }: { g: InstGroup }) {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const style = useStyle(g);
+  const real = useReal();
+  const crown = real && g.shape === 'sphere' && g.layer === 'planting';
   useLayoutEffect(() => {
     const m = mesh.current;
     if (!m) return;
     const o = new THREE.Object3D();
+    const tint = new THREE.Color();
     g.list.forEach((it, i) => {
+      // בהדמיה הריאליסטית כל עץ מקבל סיבוב, גודל וגוון מעט שונים
+      const k = real ? 0.85 + ((i * 37) % 30) / 100 : 1;
       o.position.set(...it.p);
-      o.scale.set(...it.s);
-      o.rotation.set(0, it.r, 0);
+      o.scale.set(it.s[0] * k, it.s[1] * (crown ? 1.25 * k : 1), it.s[2] * k);
+      o.rotation.set(0, real && g.shape !== 'box' ? i * 1.7 : it.r, 0);
       o.updateMatrix();
       m.setMatrixAt(i, o.matrix);
+      const l = real ? 0.78 + ((i * 53) % 40) / 100 : 1;
+      m.setColorAt(i, tint.setScalar(l));
     });
     m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
     m.computeBoundingSphere();
-  }, [g]);
+  }, [g, real, crown]);
   return (
     <instancedMesh
       ref={mesh}
-      args={[GEO[g.shape], undefined, g.list.length]}
+      key={crown ? 'crown' : 'plain'}
+      args={[crown ? CROWN : GEO[g.shape], undefined, g.list.length]}
+      castShadow={real}
+      receiveShadow={real}
       onClick={(e) => {
         e.stopPropagation();
         pick(g);
@@ -161,9 +187,13 @@ function Instances({ g }: { g: InstGroup }) {
 function Ribbon({ g }: { g: RibbonGroup }) {
   const geo = useMemo(() => ribbonGeometry(g.positions), [g]);
   const style = useStyle(g);
+  const real = useReal();
+  // הכביש עצמו מוצג רק בהדמיה הריאליסטית. במודל הוא חלק מסכמת הרחובות
+  if (g.layer === 'road' && !real) return null;
   return (
     <mesh
       geometry={geo}
+      receiveShadow={real}
       onClick={(e) => {
         e.stopPropagation();
         pick(g);

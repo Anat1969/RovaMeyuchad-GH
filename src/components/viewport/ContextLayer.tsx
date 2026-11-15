@@ -11,7 +11,7 @@ const TILE_URL = (z: number, x: number, y: number) =>
 // שכבות רזולוציה: העיר כולה, סביבת הרובע, והתוכנית עצמה. החדה מעל הגסה
 const TILE_Y: Record<number, number> = { 14: -1.2, 16: -0.8, 18: -0.4 };
 
-function Tile({ z, x, y, c }: { z: number; x: number; y: number; c: Pt[] }) {
+function Tile({ z, x, y, c, lit }: { z: number; x: number; y: number; c: Pt[]; lit: boolean }) {
   const [map, setMap] = useState<THREE.Texture | null>(null);
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -20,6 +20,7 @@ function Tile({ z, x, y, c }: { z: number; x: number; y: number; c: Pt[] }) {
     g.setAttribute('position', new THREE.Float32BufferAttribute(c.flatMap(([px, py]) => [px, h, -py]), 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 0], 2));
     g.setIndex([0, 3, 2, 0, 2, 1]);
+    g.computeVertexNormals();
     return g;
   }, [z, c]);
 
@@ -41,8 +42,9 @@ function Tile({ z, x, y, c }: { z: number; x: number; y: number; c: Pt[] }) {
 
   if (!map) return null;
   return (
-    <mesh geometry={geo}>
-      <meshBasicMaterial map={map} toneMapped={false} />
+    <mesh geometry={geo} receiveShadow={lit}>
+      {/* במצב ריאליסטי האריח מקבל אור וצל מהבניינים */}
+      {lit ? <meshStandardMaterial map={map} roughness={1} metalness={0} /> : <meshBasicMaterial map={map} toneMapped={false} />}
     </mesh>
   );
 }
@@ -69,61 +71,157 @@ function Streets({ satellite }: { satellite: boolean }) {
 
 const dist2 = (p: Pt) => p[0] * p[0] + p[1] * p[1];
 
-/** שמות הרובעים במבט רחוק, ושמות הרחובות הסמוכים לתוכנית במבט קרוב */
-function Labels({ satellite }: { satellite: boolean }) {
+/** שם רחוב כמרקם: הדפדפן מצייר את העברית, ולכן אין צורך בקובץ גופן */
+function labelTexture(text: string, light: boolean) {
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d')!;
+  const font = '600 44px Heebo, system-ui, sans-serif';
+  ctx.font = font;
+  c.width = Math.ceil(ctx.measureText(text).width) + 28;
+  c.height = 64;
+  ctx.font = font;
+  ctx.direction = 'rtl';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 9;
+  ctx.strokeStyle = light ? 'rgba(20,20,18,0.85)' : 'rgba(255,255,255,0.95)';
+  ctx.strokeText(text, c.width / 2, 34);
+  ctx.fillStyle = light ? '#FFFFFF' : '#3A3A36';
+  ctx.fillText(text, c.width / 2, 34);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return { t, ratio: c.width / c.height };
+}
+
+interface StreetLabel {
+  n: string;
+  p: Pt;
+  angle: number;
+  major: boolean;
+}
+
+/** נקודה ושיפוע לכל רחוב סמוך: באמצע הקטע הארוך ביותר שבטווח, בלי התנגשות עם שם אחר */
+function pickLabels(): StreetLabel[] {
+  const out: StreetLabel[] = [];
+  const seen = new Set<string>();
+  const byWidth = [...CONTEXT.streets].sort((a, b) => b.w - a.w);
+  for (const s of byWidth) {
+    if (seen.has(s.n)) continue;
+    let best: { p: Pt; angle: number; len: number } | null = null;
+    for (const line of s.l) {
+      for (let i = 0; i < line.length - 1; i++) {
+        const a = line[i] as Pt;
+        const b = line[i + 1] as Pt;
+        const mid: Pt = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (dist2(mid) > 1000 * 1000 || len < 30) continue;
+        // קטע ארוך וקרוב לתוכנית עדיף
+        const score = len - Math.sqrt(dist2(mid)) * 0.15;
+        if (!best || score > best.len) {
+          let angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
+          if (angle > Math.PI / 2) angle -= Math.PI;
+          if (angle <= -Math.PI / 2) angle += Math.PI;
+          best = { p: mid, angle, len: score };
+        }
+      }
+    }
+    if (!best) continue;
+    const major = s.w >= 14;
+    const gap = major ? 90 : 55;
+    if (out.some((o) => Math.hypot(o.p[0] - best!.p[0], o.p[1] - best!.p[1]) < gap)) continue;
+    seen.add(s.n);
+    out.push({ n: s.n, p: best.p, angle: best.angle, major });
+  }
+  return out;
+}
+
+/**
+ * שמות הרחובות מונחים על הקרקע, לאורך הרחוב, כמו במפה.
+ * כך בניין שעומד לפניהם מסתיר אותם, והם לא צפים מעל התלת-ממד.
+ */
+function StreetNames({ satellite }: { satellite: boolean }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const done = () => alive && setReady(true);
+    if (document.fonts?.load) document.fonts.load('600 44px Heebo').then(done, done);
+    else done();
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const labels = useMemo(pickLabels, []);
+  // גודל הכיתוב לפי המרחק: במבט רחוק רק הרחובות הראשיים, ובגדול
   const camera = useThree((s) => s.camera);
   const [band, setBand] = useState<'near' | 'mid' | 'far'>('mid');
   const last = useRef(band);
   useFrame(() => {
     const d = camera.position.length();
-    const b = d < 800 ? 'near' : d < 5200 ? 'mid' : 'far';
+    const b = d < 750 ? 'near' : d < 2600 ? 'mid' : 'far';
     if (b !== last.current) {
       last.current = b;
       setBand(b);
     }
   });
+  const items = useMemo(
+    () => (ready ? labels.map((l) => ({ ...l, ...labelTexture(l.n, satellite) })) : []),
+    [ready, labels, satellite],
+  );
+  useEffect(() => () => items.forEach((i) => i.t.dispose()), [items]);
 
-  const streets = useMemo(() => {
-    const seen = new Set<string>();
-    const out: { n: string; p: Pt; major: boolean }[] = [];
-    for (const s of CONTEXT.streets) {
-      let best: Pt | null = null;
-      for (const line of s.l) for (const p of line) if (!best || dist2(p) < dist2(best)) best = p;
-      if (!best || dist2(best) > 950 * 950 || seen.has(s.n)) continue;
-      seen.add(s.n);
-      out.push({ n: s.n, p: best, major: s.w >= 14 });
+  return (
+    <group>
+      {items.map((l) => {
+        if (band === 'far' || (band === 'mid' && !l.major)) return null;
+        const h = band === 'mid' ? 44 : l.major ? 13 : 8;
+        return (
+          <group key={l.n} position={[l.p[0], 0.7, -l.p[1]]} rotation={[0, l.angle, 0]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
+              <planeGeometry args={[h * l.ratio, h]} />
+              <meshBasicMaterial map={l.t} transparent depthWrite={false} toneMapped={false} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/** שמות הרובעים, במבט רחוק בלבד */
+function QuarterNames({ satellite }: { satellite: boolean }) {
+  const camera = useThree((s) => s.camera);
+  const [far, setFar] = useState(false);
+  const last = useRef(far);
+  useFrame(() => {
+    const f = camera.position.length() > 2600;
+    if (f !== last.current) {
+      last.current = f;
+      setFar(f);
     }
-    return out;
-  }, []);
-
+  });
+  if (!far) return null;
   const chip = satellite ? 'bg-black/55 text-white' : 'bg-white/75 text-ink/70';
   return (
     <group>
-      {band === 'far' && (
-        <Html position={[0, 3, 0]} center zIndexRange={[6, 0]} style={{ pointerEvents: 'none' }}>
-          <span className="whitespace-nowrap bg-[#D98A3D] px-1.5 py-0.5 text-xs font-semibold text-white">הרובע המיוחד</span>
+      <Html position={[0, 3, 0]} center zIndexRange={[6, 0]} style={{ pointerEvents: 'none' }}>
+        <span className="whitespace-nowrap bg-[#D98A3D] px-1.5 py-0.5 text-xs font-semibold text-white">הרובע המיוחד</span>
+      </Html>
+      {CONTEXT.quarters.map((q) => (
+        <Html key={q.id} position={[q.c[0], 2, -q.c[1]]} center zIndexRange={[4, 0]} style={{ pointerEvents: 'none' }}>
+          <span className={`whitespace-nowrap px-1.5 py-0.5 text-xs font-semibold ${chip}`}>{q.name}</span>
         </Html>
-      )}
-      {band !== 'near' &&
-        CONTEXT.quarters.map((q) => (
-          <Html key={q.id} position={[q.c[0], 2, -q.c[1]]} center zIndexRange={[4, 0]} style={{ pointerEvents: 'none' }}>
-            <span className={`whitespace-nowrap px-1.5 py-0.5 text-xs font-semibold ${chip}`}>{q.name}</span>
-          </Html>
-        ))}
-      {band !== 'far' &&
-        streets
-          .filter((s) => s.major || band === 'near')
-          .map((s) => (
-            <Html key={s.n} position={[s.p[0], 1, -s.p[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: 'none' }}>
-              <span className={`whitespace-nowrap px-1 text-[0.65rem] ${chip}`}>{s.n}</span>
-            </Html>
-          ))}
+      ))}
     </group>
   );
 }
 
 export default function ContextLayer() {
-  const mode = usePlanStore((s) => s.contextMode);
+  const chosen = usePlanStore((s) => s.contextMode);
+  const real = usePlanStore((s) => s.renderMode) === 'real';
+  // ההדמיה הריאליסטית יושבת תמיד על תצלום האוויר
+  const mode = real ? 'satellite' : chosen;
   if (mode === 'none') {
     return (
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
@@ -139,9 +237,10 @@ export default function ContextLayer() {
         <planeGeometry args={[60000, 60000]} />
         <meshBasicMaterial color={satellite ? '#C9BFAE' : '#EAE4DA'} />
       </mesh>
-      {satellite && CONTEXT.tiles.map((t) => <Tile key={`${t.z}/${t.x}/${t.y}`} {...t} />)}
-      <Streets satellite={satellite} />
-      <Labels satellite={satellite} />
+      {satellite && CONTEXT.tiles.map((t) => <Tile key={`${t.z}/${t.x}/${t.y}`} {...t} lit={real} />)}
+      {!real && <Streets satellite={satellite} />}
+      {!real && <StreetNames satellite={satellite} />}
+      {!real && <QuarterNames satellite={satellite} />}
     </group>
   );
 }

@@ -23,6 +23,7 @@ export function resolveStyle(
   activeTopicId: string | null,
   activeItemId: string | null,
   focus: LegendFocus | null,
+  real = false,
 ): PieceStyle {
   const topic = topics.find((t) => t.id === piece.layer);
   const item = topic?.items.find((i) => i.id === piece.item);
@@ -30,6 +31,8 @@ export function resolveStyle(
   const entry = item?.legend[piece.idx ?? 0] ?? item?.legend[0];
   const ghost = !item || item.status === 'pending' || !entry;
   const natural = piece.fixed ?? entry?.color ?? layerColor;
+
+  if (real) return { color: ghost ? (piece.fixed ?? '#8D8B86') : natural, opacity: 1, ghost: false };
 
   // בלי נושא, או בנושא הבינוי: הכול בצבעו הטבעי, והחסר בקווי מתאר
   if (!activeTopicId || activeTopicId === 'massing') {

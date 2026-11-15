@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Sky } from '@react-three/drei';
 import * as THREE from 'three';
 import QuarterModel from './QuarterModel';
 import PlanLayers from './PlanLayers';
 import ContextLayer from './ContextLayer';
+import ViewControls from './ViewControls';
 import { CONTEXT } from '../../data/contextData';
 import { usePlanStore, useSelection } from '../../store/planStore';
 import type { CameraView, ContextMode } from '../../types/plan';
@@ -82,6 +83,71 @@ function CameraRig() {
   return null;
 }
 
+const SUN = new THREE.Vector3(-0.55, 0.62, 0.56).normalize();
+
+/** שמיים, שמש וצללים להדמיה הריאליסטית. מפת הצל נעה עם נקודת המבט */
+function RealLight() {
+  const light = useRef<THREE.DirectionalLight>(null);
+  const controls = useThree((s) => s.controls) as unknown as { target: THREE.Vector3 } | null;
+  // גבולות מפת הצל נקבעים כאן, כי שינוי שלהם מחייב עדכון של מטריצת ההיטל
+  useEffect(() => {
+    const cam = light.current?.shadow.camera;
+    if (!cam) return;
+    cam.left = cam.bottom = -720;
+    cam.right = cam.top = 720;
+    cam.near = 10;
+    cam.far = 2200;
+    cam.updateProjectionMatrix();
+  }, []);
+  useFrame(() => {
+    const l = light.current;
+    if (!l || !controls) return;
+    l.position.copy(controls.target).addScaledVector(SUN, 1000);
+    l.target.position.copy(controls.target);
+    l.target.updateMatrixWorld();
+  });
+  return (
+    <>
+      <Sky distance={40000} sunPosition={SUN.toArray()} turbidity={5} rayleigh={1.4} mieCoefficient={0.006} mieDirectionalG={0.8} />
+      <fog attach="fog" args={['#DCE6EE', 2500, 22000]} />
+      <hemisphereLight args={['#DDEBFA', '#B7A486', 1.15]} />
+      <directionalLight
+        ref={light}
+        castShadow
+        intensity={3.4}
+        color="#FFF1DC"
+        shadow-mapSize={[4096, 4096]}
+        shadow-bias={-0.0006}
+        shadow-normalBias={0.8}
+      />
+    </>
+  );
+}
+
+/** מיפוי הגוונים: במודל הצבעים זהים למקרא, ובהדמיה הריאליסטית הם רכים כמו בצילום */
+function Tone({ real }: { real: boolean }) {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    gl.toneMapping = real ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+    gl.toneMappingExposure = real ? 0.82 : 1;
+    gl.shadowMap.enabled = real;
+    gl.shadowMap.type = THREE.PCFSoftShadowMap;
+    gl.shadowMap.needsUpdate = true;
+    scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material;
+      (Array.isArray(m) ? m : m ? [m] : []).forEach((x) => (x.needsUpdate = true));
+    });
+  }, [gl, scene, real]);
+  return null;
+}
+
+const RENDERS = [
+  { src: '/renders/path-seating.jpg', name: 'שביל חוצה רובע עם מקומות ישיבה' },
+  { src: '/renders/path-evening.jpg', name: 'שביל, גינון ושביל אופניים' },
+  { src: '/renders/street-top-large.jpg', name: 'חתך הרחוב במבט מלמעלה' },
+];
+
 const MODES: { id: ContextMode; label: string }[] = [
   { id: 'schematic', label: 'סכמת רחובות' },
   { id: 'satellite', label: 'לוויין' },
@@ -94,6 +160,11 @@ export default function Viewport3D() {
   const mode = usePlanStore((s) => s.contextMode);
   const setMode = usePlanStore((s) => s.setContextMode);
   const zoomBy = usePlanStore((s) => s.zoomBy);
+  const render = usePlanStore((s) => s.renderMode);
+  const setRender = usePlanStore((s) => s.setRenderMode);
+  const lightbox = usePlanStore((s) => s.lightbox);
+  const setLightbox = usePlanStore((s) => s.setLightbox);
+  const real = render === 'real';
   const [start] = useState(() => viewOf(usePlanStore.getState().view.name));
   const development = topic !== null && topic.id !== 'massing';
 
@@ -102,13 +173,20 @@ export default function Viewport3D() {
       <Canvas
         camera={{ position: start.pos, fov: 42, near: 1, far: 60000 }}
         dpr={[1, 2]}
-        flat
+        shadows
         onPointerMissed={() => selectTopic(null)}
       >
+        <Tone real={real} />
         <color attach="background" args={['#F5F0EB']} />
-        <hemisphereLight args={['#FFFFFF', '#E6DED3', 1.7]} />
-        <directionalLight position={[-140, 260, 160]} intensity={1.9} />
-        <directionalLight position={[180, 100, -120]} intensity={0.5} />
+        {real ? (
+          <RealLight />
+        ) : (
+          <>
+            <hemisphereLight args={['#FFFFFF', '#E6DED3', 1.7]} />
+            <directionalLight position={[-140, 260, 160]} intensity={1.9} />
+            <directionalLight position={[180, 100, -120]} intensity={0.5} />
+          </>
+        )}
         <OrbitControls
           makeDefault
           enablePan
@@ -127,33 +205,77 @@ export default function Viewport3D() {
         <PlanLayers />
       </Canvas>
 
-      {/* רקע הקונטקסט, וזום */}
-      <div className="absolute left-3 top-3 flex flex-col items-end gap-1">
-        <div className="flex gap-1 bg-white/85 p-1 shadow-sm" role="group" aria-label="רקע המפה">
+      {/* סוג ההדמיה, המבט, רקע הקונטקסט וזום */}
+      <div className="no-print absolute left-3 top-3 flex flex-col items-end gap-1">
+        <div className="flex gap-1 bg-white/85 p-1 shadow-sm" role="group" aria-label="סוג ההדמיה">
+          <button aria-pressed={!real} onClick={() => setRender('model')} className={`btn w-36 px-2 py-1 text-xs ${!real ? 'btn-on' : ''}`}>
+            הדמיית מודל
+          </button>
+          <button aria-pressed={real} onClick={() => setRender('real')} className={`btn w-36 px-2 py-1 text-xs ${real ? 'btn-on' : ''}`}>
+            הדמיה ריאליסטית
+          </button>
+        </div>
+        <div className="bg-white/85 p-1 shadow-sm">
+          <ViewControls />
+        </div>
+        <div className={`flex gap-1 bg-white/85 p-1 shadow-sm ${real ? 'opacity-40' : ''}`} role="group" aria-label="רקע המפה">
           {MODES.map((m) => (
             <button
               key={m.id}
-              aria-pressed={mode === m.id}
+              aria-pressed={!real && mode === m.id}
+              disabled={real}
+              title={real ? 'ההדמיה הריאליסטית מוצגת תמיד על תצלום אוויר' : undefined}
               onClick={() => setMode(m.id)}
-              className={`btn w-24 px-2 py-1 text-xs ${mode === m.id ? 'btn-on' : ''}`}
+              className={`btn w-24 px-2 py-1 text-xs ${!real && mode === m.id ? 'btn-on' : ''}`}
             >
               {m.label}
             </button>
           ))}
         </div>
         <div className="flex gap-1 bg-white/85 p-1 shadow-sm" role="group" aria-label="זום">
-          <button className="btn w-24 px-2 py-1 text-xs" onClick={() => zoomBy(1)}>
+          <button className="btn w-36 px-2 py-1 text-xs" onClick={() => zoomBy(1)}>
             התקרבות
           </button>
-          <button className="btn w-24 px-2 py-1 text-xs" onClick={() => zoomBy(-1)}>
+          <button className="btn w-36 px-2 py-1 text-xs" onClick={() => zoomBy(-1)}>
             התרחקות
           </button>
         </div>
       </div>
 
+      {/* הדמיות צוות התכנון: התמונות הריאליסטיות באמת, לצד הדמיית הזמן-אמת */}
+      {real && (
+        <div className="no-print absolute bottom-20 left-3 bg-white/90 p-2 shadow-md">
+          <p className="mb-1 text-xs font-semibold">הדמיות צוות התכנון, מתוך המצגת</p>
+          <div className="flex gap-1">
+            {RENDERS.map((r) => (
+              <button key={r.src} title={`${r.name}. לחיצה מגדילה`} onClick={() => setLightbox(r.src)} className="block hover:shadow-lg">
+                <img src={r.src} alt={r.name} className="h-20 w-32 object-cover" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {lightbox && (
+        <button
+          className="no-print absolute inset-0 z-20 flex items-center justify-center bg-black/80 p-6"
+          onClick={() => setLightbox(null)}
+          title="לחיצה סוגרת"
+        >
+          <img src={lightbox} alt={RENDERS.find((r) => r.src === lightbox)?.name ?? ''} className="max-h-full max-w-full shadow-2xl" />
+          <span className="absolute bottom-4 right-4 bg-white px-2 py-1 text-xs">
+            {RENDERS.find((r) => r.src === lightbox)?.name}. מקור: מצגת צוות התכנון. לחיצה סוגרת.
+          </span>
+        </button>
+      )}
+
       {/* מה מוצג, ומה מקור הגיאומטריה */}
       <div className="pointer-events-none absolute right-3 top-3 hidden max-w-[55%] bg-white/85 px-2 py-1 text-xs text-ink/75 md:block">
-        {development ? (
+        {real ? (
+          <>
+            <span className="font-semibold">הדמיה ריאליסטית בזמן אמת.</span> גובה, תכסית ונסיגת הקומות העליונות לפי התכנית. החזיתות
+            גנריות, ופרקים חסרים מוצגים באפור.
+          </>
+        ) : development ? (
           <>
             <span className="font-semibold">{topic.nameHe} על רחובות התוכנית.</span> הרחובות אמיתיים. מיקום הרכיבים
             לאורכם סכמטי.
@@ -167,7 +289,9 @@ export default function Viewport3D() {
 
       {/* שורת הסבר: מה אומר כל סימן */}
       <div className="pointer-events-none absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-x-5 gap-y-1 bg-white/80 px-2 py-1 text-xs text-ink/75">
-        {development ? (
+        {real ? (
+          <span>שמש וצללים מחושבים בזמן אמת. לתמונה ריאליסטית מלאה: ההדמיות של צוות התכנון, משמאל.</span>
+        ) : development ? (
           <>
             <span className="flex items-center gap-2">
               <span className="inline-block h-3 w-5" style={{ background: topic.layerColor }} />
@@ -193,7 +317,7 @@ export default function Viewport3D() {
         )}
         <span className="hidden md:inline">גלגלת העכבר: זום אל הסמן. גרירה: סיבוב. גרירה בלחצן ימני: הזזה.</span>
         <span className="mr-auto text-[0.65rem] text-ink/50" dir="ltr">
-          {mode === 'satellite' ? 'Imagery: Esri, Maxar, Earthstar Geographics' : mode === 'schematic' ? '© OpenStreetMap contributors' : ''}
+          {real || mode === 'satellite' ? 'Imagery: Esri, Maxar, Earthstar Geographics' : mode === 'schematic' ? '© OpenStreetMap contributors' : ''}
         </span>
       </div>
     </div>

@@ -2,6 +2,21 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CameraView, ContextMode, ItemStatus, PlanTopic, SpecItem } from '../types/plan';
 import { PLAN_TOPICS, withAlternative } from '../data/planData';
+import { SEED_TASKS, type Go, type PanelId } from '../data/insights';
+
+/** משימה בתוכנית העבודה */
+export interface WorkTask {
+  id: string;
+  date: string; // תאריך יעד, YYYY-MM-DD. ריק: עוד לא נקבע
+  topic: string; // מזהה נושא, או 'general'
+  text: string;
+  done: boolean;
+}
+
+export type RenderMode = 'model' | 'real';
+
+const seedTasks = (): WorkTask[] =>
+  SEED_TASKS.map((t, i) => ({ id: `seed-${i}`, date: '', topic: t.topic, text: t.text, done: false }));
 
 export interface LegendFocus {
   itemId: string;
@@ -18,6 +33,10 @@ interface PlanState {
   view: { name: CameraView | 'detail'; tick: number };
   zoom: { dir: 1 | -1; tick: number };
   contextMode: ContextMode;
+  renderMode: RenderMode;
+  panel: PanelId | null; // לוח התובנות שפתוח בצד
+  tasks: WorkTask[];
+  lightbox: string | null;
   savedAt: number;
 
   selectTopic: (id: string | null, itemId?: string) => void;
@@ -33,6 +52,14 @@ interface PlanState {
   setView: (name: CameraView) => void;
   zoomBy: (dir: 1 | -1) => void;
   setContextMode: (m: ContextMode) => void;
+  setRenderMode: (m: RenderMode) => void;
+  setPanel: (p: PanelId | null) => void;
+  setLightbox: (src: string | null) => void;
+  /** קישור מתובנה אל המודל: בוחר נושא, פריט, חלופה ומבט, ומשאיר את הלוח פתוח */
+  go: (g: Go) => void;
+  addTask: (t: Omit<WorkTask, 'id' | 'done'>) => void;
+  updateTask: (id: string, patch: Partial<WorkTask>) => void;
+  removeTask: (id: string) => void;
 }
 
 const clone = (t: PlanTopic[]): PlanTopic[] => JSON.parse(JSON.stringify(t));
@@ -56,6 +83,10 @@ export const usePlanStore = create<PlanState>()(
       view: { name: 'perspective', tick: 0 },
       zoom: { dir: 1, tick: 0 },
       contextMode: 'schematic',
+      renderMode: 'model',
+      panel: null,
+      tasks: seedTasks(),
+      lightbox: null,
       savedAt: 0,
 
       selectTopic: (id, itemId) =>
@@ -147,6 +178,7 @@ export const usePlanStore = create<PlanState>()(
           selectedTopicId: null,
           selectedItemId: null,
           selectedLot: null,
+          tasks: seedTasks(),
           savedAt: Date.now(),
         }),
       setLegendFocus: (f) => set({ legendFocus: f }),
@@ -160,10 +192,39 @@ export const usePlanStore = create<PlanState>()(
       setView: (name) => set((s) => ({ view: { name, tick: s.view.tick + 1 } })),
       zoomBy: (dir) => set((s) => ({ zoom: { dir, tick: s.zoom.tick + 1 } })),
       setContextMode: (m) => set({ contextMode: m }),
+      setRenderMode: (m) => set({ renderMode: m }),
+      setPanel: (p) => set({ panel: p }),
+      setLightbox: (src) => set({ lightbox: src }),
+      go: (g) =>
+        set((s) => {
+          let topics = s.topics;
+          if (g.alt && g.topic && g.item) {
+            topics = topics.map((t) =>
+              t.id !== g.topic ? t : { ...t, items: t.items.map((i) => (i.id === g.item ? withAlternative(i, g.alt) : i)) },
+            );
+          }
+          const topic = g.topic === undefined ? undefined : (topics.find((t) => t.id === g.topic) ?? null);
+          return {
+            topics,
+            legendFocus: null,
+            ...(topic !== undefined && {
+              selectedTopicId: topic?.id ?? null,
+              selectedItemId: topic ? (g.item ?? topic.items[0]?.id ?? null) : null,
+              selectedLot: g.lot ?? null,
+            }),
+            ...(g.view && { view: { name: g.view, tick: s.view.tick + 1 } }),
+            ...(g.context && { contextMode: g.context }),
+            ...(g.render && { renderMode: g.render }),
+          };
+        }),
+      addTask: (t) => set((s) => ({ savedAt: Date.now(), tasks: [...s.tasks, { ...t, id: `t-${Date.now()}`, done: false }] })),
+      updateTask: (id, patch) =>
+        set((s) => ({ savedAt: Date.now(), tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) })),
+      removeTask: (id) => set((s) => ({ savedAt: Date.now(), tasks: s.tasks.filter((t) => t.id !== id) })),
     }),
     {
-      name: 'rova3d-plan-v4',
-      partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode }),
+      name: 'rova3d-plan-v5',
+      partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode, renderMode: s.renderMode, tasks: s.tasks }),
     },
   ),
 );

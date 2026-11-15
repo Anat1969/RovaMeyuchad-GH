@@ -66,3 +66,36 @@ body,
 .hatch {
   background-image: repeating-linear-gradient(135deg, rgba(46, 46, 43, 0.1) 0 2px, transparent 2px 12px);
 }
+
+/* הדפסה: רק הטקסט של הלוח הפתוח, בעמוד מלא */
+@media print {
+  html,
+  body,
+  #root {
+    height: auto;
+    overflow: visible;
+  }
+  .no-print,
+  main {
+    display: none !important;
+  }
+  .print-root {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .print-area {
+    font-size: 11pt;
+  }
+  .print-area li {
+    break-inside: avoid;
+    background: none !important;
+    border-bottom: 1px solid #ddd;
+  }
+  @page {
+    margin: 16mm;
+  }
+}

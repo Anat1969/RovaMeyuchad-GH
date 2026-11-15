@@ -17,7 +17,7 @@ export default function ViewControls() {
           key={v.id}
           onClick={() => setView(v.id)}
           aria-pressed={view.name === v.id}
-          className={`btn w-28 ${view.name === v.id ? 'btn-on' : ''}`}
+          className={`btn w-24 px-2 py-1 text-xs ${view.name === v.id ? 'btn-on' : ''}`}
         >
           {v.label}
         </button>

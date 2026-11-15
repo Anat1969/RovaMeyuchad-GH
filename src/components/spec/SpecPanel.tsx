@@ -8,6 +8,9 @@ import SpecEditForm from './SpecEditForm';
 import SpecStatutory from './SpecStatutory';
 import QuarterPanel from './QuarterPanel';
 import SpecAlternatives from './SpecAlternatives';
+import InsightPanelView from '../insight/InsightPanelView';
+import StatusPanel from '../insight/StatusPanel';
+import WorkPlan from '../insight/WorkPlan';
 
 export default function SpecPanel() {
   const { topic, item } = useSelection();
@@ -15,6 +18,7 @@ export default function SpecPanel() {
   const selectItem = usePlanStore((s) => s.selectItem);
   const selectTopic = usePlanStore((s) => s.selectTopic);
   const addItem = usePlanStore((s) => s.addItem);
+  const panel = usePlanStore((s) => s.panel);
 
   const newItem = () => {
     if (!topic) return;
@@ -32,9 +36,15 @@ export default function SpecPanel() {
   return (
     <aside
       aria-label="מפרט"
-      className="min-h-0 flex-1 overflow-y-auto bg-white p-4 shadow-[-1px_0_0_#E7E2DA_inset] md:h-full md:flex-1 md:p-6"
+      className="print-root min-h-0 flex-1 overflow-y-auto bg-white p-4 shadow-[-1px_0_0_#E7E2DA_inset] md:h-full md:flex-1 md:p-6"
     >
-      {!topic || !item ? (
+      {panel === 'status' ? (
+        <StatusPanel />
+      ) : panel === 'work' ? (
+        <WorkPlan />
+      ) : panel ? (
+        <InsightPanelView key={panel} id={panel} />
+      ) : !topic || !item ? (
         <SpecEmpty />
       ) : (
         <div key={topic.id} className="fade-in">
