@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { sortedTopics, usePlanStore } from '../../store/planStore';
 import PanelShell from './PanelShell';
+import { IconBtn } from '../ui/Icon';
 
 const fmt = (d: string) => (d ? d.split('-').reverse().join('.') : 'בלי תאריך');
 
@@ -86,13 +87,9 @@ export default function WorkPlan() {
                     onChange={(e) => updateTask(t.id, { date: e.target.value })}
                   />
                   {t.topic !== 'general' && (
-                    <button className="btn px-2 py-1 text-xs" onClick={() => go({ topic: t.topic, view: t.topic === 'massing' ? 'perspective' : 'detail' })}>
-                      הצגה במודל
-                    </button>
+                    <IconBtn icon="show" label="הצגה במודל" onClick={() => go({ topic: t.topic, view: t.topic === 'massing' ? 'perspective' : 'detail' })} />
                   )}
-                  <button className="btn px-2 py-1 text-xs" onClick={() => removeTask(t.id)}>
-                    מחיקה
-                  </button>
+                  <IconBtn icon="trash" label="מחיקת המשימה" onClick={() => removeTask(t.id)} />
                 </div>
               </div>
             </li>

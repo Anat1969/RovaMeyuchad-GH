@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PANELS, TONE_LABEL, type InsightBlock, type InsightItem, type PanelId, type Tone } from '../../data/insights';
 import { usePlanStore } from '../../store/planStore';
 import PanelShell from './PanelShell';
+import { IconBtn } from '../ui/Icon';
 
 const TONE_CLS: Record<Tone, string> = {
   ok: 'bg-done/10 text-done',
@@ -34,9 +35,7 @@ export function ItemRow({ it, n }: { it: InsightItem; n: number }) {
         )}
         {it.ref && <p className="mt-1 text-xs text-ink/45">מקור: {it.ref}</p>}
         {it.go && (
-          <button className="btn no-print mt-2 px-3 py-1 text-xs" onClick={() => go(it.go!)} title="מציג את הנושא במודל שמימין">
-            הצגה במודל
-          </button>
+<IconBtn icon="show" label="הצגה במודל" className="no-print mt-2" onClick={() => go(it.go!)} />
         )}
       </div>
     </li>

@@ -6,6 +6,7 @@ import { QUARTER } from '../../data/quarterData';
 import type { QuarterLot } from '../../types/plan';
 import { usePlanStore } from '../../store/planStore';
 import { FLOOR, facadeTextures } from './facades';
+import { DESIGNS } from '../../data/designData';
 
 type Ring = [number, number][];
 
@@ -91,14 +92,14 @@ function Solid({
   if (facade) {
     // קבוצה 0 בגיאומטריה היא הגג, קבוצה 1 היא הקירות
     return (
-      <mesh geometry={geo} position={[0, base, 0]} castShadow receiveShadow {...events}>
+      <mesh key="real" geometry={geo} position={[0, base, 0]} castShadow receiveShadow {...events}>
         <meshStandardMaterial attach="material-0" color="#CFC8BC" roughness={0.95} />
         <meshStandardMaterial attach="material-1" map={facade} roughness={0.55} metalness={0.08} />
       </mesh>
     );
   }
   return (
-    <mesh geometry={geo} position={[0, base, 0]} {...events}>
+    <mesh key="model" geometry={geo} position={[0, base, 0]} {...events}>
       <meshStandardMaterial ref={mat} transparent roughness={0.9} color={color} opacity={opacity} side={THREE.DoubleSide} />
     </mesh>
   );
@@ -114,6 +115,8 @@ function Lot({ lot, real }: { lot: QuarterLot; real: boolean }) {
   const topicId = usePlanStore((s) => s.selectedTopicId);
   // בנושא פיתוח המסות נסוגות לרקע, כדי שהרחוב ייראה
   const back = topicId !== null && topicId !== 'massing';
+  const massMode = usePlanStore((s) => s.massMode);
+  const design = DESIGNS.find((d) => d.lot === lot.num);
 
   // הצבעים נלקחים מהמקרא של נושא הבינוי, כמו בכל שאר המודל
   const legend = topics.find((t) => t.id === 'massing')?.items[0]?.legend ?? [];
@@ -130,6 +133,23 @@ function Lot({ lot, real }: { lot: QuarterLot; real: boolean }) {
   const pick = () => selectLot(isSel ? null : lot.num);
   const towerBase = podium ? PODIUM_H + 0.1 : 0.1;
   const towerH = lot.height - (podium ? PODIUM_H : 0);
+
+  // מודל התכנון: המסות של האדריכל אם הועלו, ואם לא, רק קו המעטפת המותרת
+  if (massMode === 'design') {
+    return (
+      <group>
+        {!real && <Solid ring={lot.ring} base={0.05} height={0} color={lot.mixed ? cMixed : cRes} opacity={0.3} onClick={pick} />}
+        {!real && <Line points={flat(lot.ring, 0.2)} color={isSel ? '#2E2E2B' : '#B9895A'} lineWidth={isSel ? 3 : 1} />}
+        {design ? (
+          design.masses.map((m, i) => (
+            <Solid key={i} ring={m.ring} base={m.base} height={m.height} color={cMixed} opacity={1} facade={real ? facadeTextures().stone : undefined} onClick={pick} />
+          ))
+        ) : (
+          <Line points={flat(tower, lot.height)} color="#B9895A" lineWidth={1} dashed dashSize={4} gapSize={3} />
+        )}
+      </group>
+    );
+  }
 
   if (real) {
     const tex = facadeTextures();

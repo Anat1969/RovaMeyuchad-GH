@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { CameraView, ContextMode, ItemStatus, PlanTopic, SpecItem } from '../types/plan';
+import type { CameraView, ContextMode, ItemStatus, MassMode, PlanTopic, SpecItem } from '../types/plan';
+import { PUBLIC } from '../data/publicData';
+
+const PUBLIC_NUMS = new Set(PUBLIC.lots.map((l) => l.num));
 import { PLAN_TOPICS, withAlternative } from '../data/planData';
 import { SEED_TASKS, type Go, type PanelId } from '../data/insights';
 
@@ -34,6 +37,7 @@ interface PlanState {
   zoom: { dir: 1 | -1; tick: number };
   contextMode: ContextMode;
   renderMode: RenderMode;
+  massMode: MassMode; // מודל הזכויות, או מודל התכנון של האדריכל
   panel: PanelId | null; // לוח התובנות שפתוח בצד
   tasks: WorkTask[];
   lightbox: string | null;
@@ -53,6 +57,7 @@ interface PlanState {
   zoomBy: (dir: 1 | -1) => void;
   setContextMode: (m: ContextMode) => void;
   setRenderMode: (m: RenderMode) => void;
+  setMassMode: (m: MassMode) => void;
   setPanel: (p: PanelId | null) => void;
   setLightbox: (src: string | null) => void;
   /** קישור מתובנה אל המודל: בוחר נושא, פריט, חלופה ומבט, ומשאיר את הלוח פתוח */
@@ -84,6 +89,7 @@ export const usePlanStore = create<PlanState>()(
       zoom: { dir: 1, tick: 0 },
       contextMode: 'schematic',
       renderMode: 'model',
+      massMode: 'rights',
       panel: null,
       tasks: seedTasks(),
       lightbox: null,
@@ -96,7 +102,7 @@ export const usePlanStore = create<PlanState>()(
             selectedTopicId: topic?.id ?? null,
             selectedItemId: topic ? (itemId ?? topic.items[0]?.id ?? null) : null,
             legendFocus: null,
-            selectedLot: topic?.id === 'massing' ? s.selectedLot : null,
+            selectedLot: topic?.id === 'massing' || topic?.id === 'public' ? s.selectedLot : null,
             // נושא פיתוח נפתח במבט קרוב על רחובות התוכנית. חזרה למבט הכולל מרחיקה שוב
             view:
               topic && topic.id !== 'massing' && s.selectedTopicId !== topic.id && s.view.name !== 'detail'
@@ -186,13 +192,16 @@ export const usePlanStore = create<PlanState>()(
       selectLot: (num) =>
         set((s) =>
           num
-            ? { selectedLot: num, selectedTopicId: 'massing', selectedItemId: 'massing-main', legendFocus: null }
+            ? PUBLIC_NUMS.has(num)
+              ? { selectedLot: num, selectedTopicId: 'public', selectedItemId: 'public-main', legendFocus: null, panel: null }
+              : { selectedLot: num, selectedTopicId: 'massing', selectedItemId: 'massing-main', legendFocus: null, panel: null }
             : { selectedLot: null, selectedTopicId: s.selectedTopicId },
         ),
       setView: (name) => set((s) => ({ view: { name, tick: s.view.tick + 1 } })),
       zoomBy: (dir) => set((s) => ({ zoom: { dir, tick: s.zoom.tick + 1 } })),
       setContextMode: (m) => set({ contextMode: m }),
       setRenderMode: (m) => set({ renderMode: m }),
+      setMassMode: (m) => set({ massMode: m }),
       setPanel: (p) => set({ panel: p }),
       setLightbox: (src) => set({ lightbox: src }),
       go: (g) =>
@@ -223,8 +232,8 @@ export const usePlanStore = create<PlanState>()(
       removeTask: (id) => set((s) => ({ savedAt: Date.now(), tasks: s.tasks.filter((t) => t.id !== id) })),
     }),
     {
-      name: 'rova3d-plan-v5',
-      partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode, renderMode: s.renderMode, tasks: s.tasks }),
+      name: 'rova3d-plan-v6',
+      partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode, renderMode: s.renderMode, massMode: s.massMode, tasks: s.tasks }),
     },
   ),
 );

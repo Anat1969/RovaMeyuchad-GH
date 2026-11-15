@@ -101,3 +101,41 @@ export interface ContextData {
 }
 
 export type ContextMode = 'schematic' | 'satellite' | 'none';
+
+export type PublicKind = 'public' | 'education' | 'dorms' | 'mixed' | 'facility' | 'open' | 'forest' | 'openland';
+
+/** תא שטח שאינו מגורים, מתכנית 3/124/03/3: גיאומטריה מהשרטוט, זכויות מטבלת ההוראות */
+export interface PublicLot {
+  num: string;
+  kind: PublicKind;
+  ring: Ring;
+  areaDrawn: number; // מ"ר לפי השרטוט
+  areaTable: number | null; // מ"ר בטבלת הזכויות
+  main?: number; // שטח עיקרי מעל הקרקע, אחוז מהמגרש
+  mainArea?: number; // שטח עיקרי מעל הקרקע, מ"ר (כשהטבלה נוקבת במ"ר)
+  service?: number;
+  total?: number; // אחוזי בנייה כוללים
+  coverage?: number;
+  height?: number;
+  floors?: number;
+  below?: number;
+  units?: number;
+  dormArea?: number;
+  note?: string;
+}
+
+export interface PublicData {
+  lots: PublicLot[];
+  roads: Ring[];
+}
+
+/** מודל האדריכל המתכנן למגרש: מסות לפי התכנון בפועל, להבדיל ממעטפת הזכויות */
+export interface DesignModel {
+  lot: string;
+  name: string;
+  architect?: string;
+  source: string; // מאיזה מסמך נלקח
+  masses: { ring: Ring; base: number; height: number }[];
+}
+
+export type MassMode = 'rights' | 'design';

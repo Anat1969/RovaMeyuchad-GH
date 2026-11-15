@@ -5,10 +5,12 @@ import * as THREE from 'three';
 import QuarterModel from './QuarterModel';
 import PlanLayers from './PlanLayers';
 import ContextLayer from './ContextLayer';
-import ViewControls from './ViewControls';
+import PublicLots from './PublicLots';
+import { IconBtn } from '../ui/Icon';
+import { DESIGNS } from '../../data/designData';
 import { CONTEXT } from '../../data/contextData';
 import { usePlanStore, useSelection } from '../../store/planStore';
-import type { CameraView, ContextMode } from '../../types/plan';
+import type { CameraView } from '../../types/plan';
 
 type V3 = [number, number, number];
 type View = { pos: V3; target: V3 };
@@ -148,11 +150,6 @@ const RENDERS = [
   { src: '/renders/street-top-large.jpg', name: 'חתך הרחוב במבט מלמעלה' },
 ];
 
-const MODES: { id: ContextMode; label: string }[] = [
-  { id: 'schematic', label: 'סכמת רחובות' },
-  { id: 'satellite', label: 'לוויין' },
-  { id: 'none', label: 'ללא רקע' },
-];
 
 export default function Viewport3D() {
   const { topic } = useSelection();
@@ -165,8 +162,12 @@ export default function Viewport3D() {
   const lightbox = usePlanStore((s) => s.lightbox);
   const setLightbox = usePlanStore((s) => s.setLightbox);
   const real = render === 'real';
+  const massMode = usePlanStore((s) => s.massMode);
+  const setMassMode = usePlanStore((s) => s.setMassMode);
+  const viewName = usePlanStore((s) => s.view.name);
+  const setView = usePlanStore((s) => s.setView);
   const [start] = useState(() => viewOf(usePlanStore.getState().view.name));
-  const development = topic !== null && topic.id !== 'massing';
+  const development = topic !== null && topic.id !== 'massing' && topic.id !== 'public';
 
   return (
     <div className="viewport-canvas relative h-full w-full bg-sand">
@@ -202,49 +203,33 @@ export default function Viewport3D() {
         <CameraRig />
         <ContextLayer />
         <QuarterModel />
+        <PublicLots />
         <PlanLayers />
       </Canvas>
 
-      {/* סוג ההדמיה, המבט, רקע הקונטקסט וזום */}
-      <div className="no-print absolute left-3 top-3 flex flex-col items-end gap-1">
-        <div className="flex gap-1 bg-white/85 p-1 shadow-sm" role="group" aria-label="סוג ההדמיה">
-          <button aria-pressed={!real} onClick={() => setRender('model')} className={`btn w-36 px-2 py-1 text-xs ${!real ? 'btn-on' : ''}`}>
-            הדמיית מודל
-          </button>
-          <button aria-pressed={real} onClick={() => setRender('real')} className={`btn w-36 px-2 py-1 text-xs ${real ? 'btn-on' : ''}`}>
-            הדמיה ריאליסטית
-          </button>
-        </div>
-        <div className="bg-white/85 p-1 shadow-sm">
-          <ViewControls />
-        </div>
-        <div className={`flex gap-1 bg-white/85 p-1 shadow-sm ${real ? 'opacity-40' : ''}`} role="group" aria-label="רקע המפה">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              aria-pressed={!real && mode === m.id}
-              disabled={real}
-              title={real ? 'ההדמיה הריאליסטית מוצגת תמיד על תצלום אוויר' : undefined}
-              onClick={() => setMode(m.id)}
-              className={`btn w-24 px-2 py-1 text-xs ${!real && mode === m.id ? 'btn-on' : ''}`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-1 bg-white/85 p-1 shadow-sm" role="group" aria-label="זום">
-          <button className="btn w-36 px-2 py-1 text-xs" onClick={() => zoomBy(1)}>
-            התקרבות
-          </button>
-          <button className="btn w-36 px-2 py-1 text-xs" onClick={() => zoomBy(-1)}>
-            התרחקות
-          </button>
-        </div>
+      {/* סרגל כלים אנכי, באייקונים: הדמיה, מודל, מבט, רקע וזום. התווית בריחוף */}
+      <div className="no-print absolute left-3 top-3 flex flex-col gap-1 bg-white/90 p-1 shadow-md" role="toolbar" aria-label="כלי ההדמיה">
+        <IconBtn icon="model" label="הדמיית מודל: צבעי המקרא" on={!real} onClick={() => setRender('model')} />
+        <IconBtn icon="real" label="הדמיה ריאליסטית: שמש, צללים ותצלום אוויר" on={real} onClick={() => setRender('real')} />
+        <span className="my-0.5 h-px bg-ink/15" />
+        <IconBtn icon="rights" label='מודל הזכויות: המעטפת המרבית לפי התב"ע' on={massMode === 'rights'} onClick={() => setMassMode('rights')} />
+        <IconBtn icon="design" label="מודל התכנון: הבניינים לפי תכנון האדריכל" on={massMode === 'design'} onClick={() => setMassMode('design')} />
+        <span className="my-0.5 h-px bg-ink/15" />
+        <IconBtn icon="top" label="תצוגה עילית" on={viewName === 'top'} onClick={() => setView('top')} />
+        <IconBtn icon="perspective" label="פרספקטיבה" on={viewName === 'perspective'} onClick={() => setView('perspective')} />
+        <IconBtn icon="street" label="תצוגת רחוב" on={viewName === 'street'} onClick={() => setView('street')} />
+        <span className="my-0.5 h-px bg-ink/15" />
+        <IconBtn icon="map" label="רקע: סכמת רחובות" on={!real && mode === 'schematic'} disabled={real} onClick={() => setMode('schematic')} />
+        <IconBtn icon="satellite" label="רקע: תצלום לוויין" on={real || mode === 'satellite'} disabled={real} onClick={() => setMode('satellite')} />
+        <IconBtn icon="none" label="בלי רקע" on={!real && mode === 'none'} disabled={real} onClick={() => setMode('none')} />
+        <span className="my-0.5 h-px bg-ink/15" />
+        <IconBtn icon="zoomIn" label="התקרבות" onClick={() => zoomBy(1)} />
+        <IconBtn icon="zoomOut" label="התרחקות" onClick={() => zoomBy(-1)} />
       </div>
 
       {/* הדמיות צוות התכנון: התמונות הריאליסטיות באמת, לצד הדמיית הזמן-אמת */}
       {real && (
-        <div className="no-print absolute bottom-20 left-3 bg-white/90 p-2 shadow-md">
+        <div className="no-print absolute bottom-20 left-14 bg-white/90 p-2 shadow-md">
           <p className="mb-1 text-xs font-semibold">הדמיות צוות התכנון, מתוך המצגת</p>
           <div className="flex gap-1">
             {RENDERS.map((r) => (
@@ -270,9 +255,13 @@ export default function Viewport3D() {
 
       {/* מה מוצג, ומה מקור הגיאומטריה */}
       <div className="pointer-events-none absolute right-3 top-3 hidden max-w-[55%] bg-white/85 px-2 py-1 text-xs text-ink/75 md:block">
-        {real ? (
+        {massMode === 'design' ? (
           <>
-            <span className="font-semibold">הדמיה ריאליסטית בזמן אמת.</span> גובה, תכסית ונסיגת הקומות העליונות לפי התכנית. החזיתות
+            <span className="font-semibold">מודל התכנון.</span> הועלו מודלי אדריכל ל-{DESIGNS.length} מגרשים. לשאר מוצג קו המעטפת המותרת בלבד.
+          </>
+        ) : real ? (
+          <>
+            <span className="font-semibold">מודל הזכויות, בהדמיה ריאליסטית.</span> גובה, תכסית ונסיגת הקומות העליונות לפי התכנית. החזיתות
             גנריות, ופרקים חסרים מוצגים באפור.
           </>
         ) : development ? (
@@ -282,7 +271,7 @@ export default function Viewport3D() {
           </>
         ) : (
           <>
-            <span className="font-semibold">הרובע בתוך העיר.</span> המגרשים מקובצי התכנית 603-0811588. המסות סכמטיות.
+            <span className="font-semibold">מודל הזכויות.</span> כל מסה היא המעטפת המרבית שהתב"ע מתירה: מגורים, ציבור, חינוך ומסחר.
           </>
         )}
       </div>

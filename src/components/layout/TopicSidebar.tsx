@@ -49,7 +49,7 @@ export default function TopicSidebar() {
             key={t.id}
             onClick={() => {
               setPanel(null);
-              go(on ? { topic: null, view: 'perspective' } : { topic: t.id, view: t.id === 'massing' ? 'perspective' : 'detail' });
+              go(on ? { topic: null, view: 'perspective' } : { topic: t.id, view: t.id === 'massing' || t.id === 'public' ? 'perspective' : 'detail' });
             }}
             aria-pressed={on}
             title={`${t.nameHe}: ${STATUS_LABEL[t.status]}`}

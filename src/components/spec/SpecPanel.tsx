@@ -7,6 +7,8 @@ import SpecPending from './SpecPending';
 import SpecEditForm from './SpecEditForm';
 import SpecStatutory from './SpecStatutory';
 import QuarterPanel from './QuarterPanel';
+import PublicPanel from './PublicPanel';
+import { IconBtn } from '../ui/Icon';
 import SpecAlternatives from './SpecAlternatives';
 import InsightPanelView from '../insight/InsightPanelView';
 import StatusPanel from '../insight/StatusPanel';
@@ -54,12 +56,10 @@ export default function SpecPanel() {
           <div className="mb-4 flex items-center gap-2">
             <span className="h-3 w-3" style={{ background: topic.layerColor }} />
             <span className="flex-1 text-sm font-semibold">{topic.nameHe}</span>
-            <button className="btn px-2 py-1 text-xs" onClick={() => selectTopic(null)}>
-              חזרה למבט הכולל
-            </button>
+            <IconBtn icon="home" label="חזרה למבט הכולל" onClick={() => selectTopic(null)} />
           </div>
 
-          {topic.id !== 'massing' && (topic.items.length > 1 || isEditMode) && (
+          {topic.id !== 'massing' && topic.id !== 'public' && (topic.items.length > 1 || isEditMode) && (
             <div className="mb-4 flex flex-wrap gap-1" role="tablist" aria-label="פריטים בנושא">
               {topic.items.map((i) => (
                 <button
@@ -87,6 +87,8 @@ export default function SpecPanel() {
           >
             {topic.id === 'massing' ? (
               <QuarterPanel topic={topic} item={item} />
+            ) : topic.id === 'public' ? (
+              <PublicPanel topic={topic} item={item} />
             ) : item.alternatives?.length ? (
               <>
                 <SpecAlternatives item={item} topic={topic} />

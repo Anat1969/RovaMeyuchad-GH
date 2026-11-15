@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { usePlanStore } from '../../store/planStore';
+import { IconBtn } from '../ui/Icon';
 
 /**
  * מעטפת לכל לוח תובנות: כותרת, פעולות (הדפסה, העתקה, מייל) ותוכן.
@@ -40,18 +41,10 @@ export default function PanelShell({ name, title, lead, children }: { name: stri
     <div className="fade-in">
       <div className="no-print mb-3 flex flex-wrap items-center gap-1">
         <span className="flex-1 text-sm font-semibold">{name}</span>
-        <button className="btn w-20 px-2 py-1 text-xs" onClick={() => window.print()} title="מדפיס רק את הטקסט שבלוח הזה">
-          הדפסה
-        </button>
-        <button className="btn w-20 px-2 py-1 text-xs" onClick={copy}>
-          העתקה
-        </button>
-        <button className="btn w-24 px-2 py-1 text-xs" onClick={mail}>
-          שליחה במייל
-        </button>
-        <button className="btn w-16 px-2 py-1 text-xs" onClick={() => setPanel(null)}>
-          סגירה
-        </button>
+        <IconBtn icon="print" label="הדפסה: רק הטקסט שבלוח הזה" onClick={() => window.print()} />
+        <IconBtn icon="copy" label="העתקת הטקסט" onClick={copy} />
+        <IconBtn icon="mail" label="שליחה במייל" onClick={mail} />
+        <IconBtn icon="close" label="סגירת הלוח" onClick={() => setPanel(null)} />
         <span className="w-full text-xs text-done" aria-live="polite">
           {msg}
         </span>

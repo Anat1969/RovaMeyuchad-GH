@@ -4,6 +4,7 @@ import type { PlanTopic, QuarterLot, SpecItem } from '../../types/plan';
 import { usePlanStore } from '../../store/planStore';
 import SpecLegend from './SpecLegend';
 import SpecStatutory from './SpecStatutory';
+import { IconBtn } from '../ui/Icon';
 
 type SortKey = 'num' | 'height' | 'units';
 const SORTS: { id: SortKey; label: string }[] = [
@@ -36,15 +37,9 @@ function LotCard({ lot, list }: { lot: QuarterLot; list: QuarterLot[] }) {
         <h3 className="flex-1 text-xl font-light">
           מגרש <span className="font-semibold">{lot.num}</span>
         </h3>
-        <button className="btn w-16 px-2 py-1 text-xs" onClick={() => step(-1)}>
-          הקודם
-        </button>
-        <button className="btn w-16 px-2 py-1 text-xs" onClick={() => step(1)}>
-          הבא
-        </button>
-        <button className="btn px-2 py-1 text-xs" onClick={() => selectLot(null)}>
-          סגירה
-        </button>
+        <IconBtn icon="prev" label="המגרש הקודם" onClick={() => step(-1)} />
+        <IconBtn icon="next" label="המגרש הבא" onClick={() => step(1)} />
+        <IconBtn icon="close" label="סגירת הכרטיס" onClick={() => selectLot(null)} />
       </div>
       <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
         {rows.map(([k, v]) => (

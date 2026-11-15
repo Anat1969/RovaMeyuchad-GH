@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { METRICS, METRIC_CHAPTERS, STATE_HINT, STATE_LABEL, type MetricState } from '../../data/metrics';
 import { usePlanStore } from '../../store/planStore';
 import PanelShell from './PanelShell';
+import { IconBtn } from '../ui/Icon';
+import { OFFICIAL, OFFICIAL_DATE, OFFICIAL_SUMMARY, OFFICIAL_URL } from '../../data/official360';
 
 const ORDER: MetricState[] = ['fit', 'adjust', 'add', 'out'];
 const BAR: Record<MetricState, string> = { fit: 'bg-done', adjust: 'bg-[#D9A23D]', add: 'bg-red-700/70', out: 'bg-ink/20' };
@@ -18,6 +20,10 @@ export default function MetricsPanel() {
   const [filter, setFilter] = useState<MetricState | 'all'>('all');
   const n = (s: MetricState) => METRICS.filter((m) => m.state === s).length;
   const points = (s: MetricState) => METRICS.filter((m) => m.state === s).reduce((a, m) => a + m.max, 0);
+  // הניקוד הרשמי: רק מדדים שנמדדו נכנסים לחישוב. "לא ניתן למדוד" אינו אפס
+  const measured = METRICS.filter((m) => OFFICIAL[m.id]?.s != null);
+  const got = measured.reduce((a, m) => a + (OFFICIAL[m.id].s as number), 0);
+  const maxMeasured = measured.reduce((a, m) => a + m.max, 0);
 
   return (
     <PanelShell
@@ -25,6 +31,31 @@ export default function MetricsPanel() {
       title={`מתוך 44 מדדים: ${n('fit')} מתאימים, ${n('adjust')} דורשים התאמה, ${n('add')} חסרים`}
       lead="דוח בדיקה של תוכנית הבינוי מול מדדי שכונה 360° (המועצה לבנייה ירוקה ומשרד הבינוי, גרסה 2.0). לכל מדד: מה כבר יש בתוכנית, ומה האדריכל צריך לעשות."
     >
+      {/* הדוח הרשמי מאפליקציית שכונה 360 */}
+      <section className="mt-4 bg-ink/[0.04] p-3">
+        <div className="flex items-start gap-3">
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold">הניקוד הרשמי באפליקציית שכונה 360°</h3>
+            <p className="mt-1 text-3xl font-light leading-none">
+              {got} <span className="text-base text-ink/55">מתוך {maxMeasured} נקודות שנמדדו</span>
+            </p>
+            <p className="mt-1 text-sm text-ink/70">
+              נמדדו <span className="font-semibold">{measured.length}</span> מדדים מתוך 44. <span className="font-semibold">{44 - measured.length}</span> לא ניתנים למדידה
+              מהמסמכים. הסף לדרגת ארד: 55 נקודות מתוך 120.
+            </p>
+          </div>
+          <a className="btn no-print shrink-0 gap-1 px-2 py-1 text-xs underline decoration-ink/30 underline-offset-4" href={OFFICIAL_URL} target="_blank" rel="noreferrer">
+            פתיחה בשכונה 360°
+          </a>
+        </div>
+        <p className="mt-2 text-sm leading-relaxed">{OFFICIAL_SUMMARY}</p>
+        <p className="mt-2 text-xs leading-relaxed text-ink/50">
+          המדידה: {OFFICIAL_DATE}, אוטומטית, שלב ב', מול הוראות תכנית 603-0811588 בלבד. המצגת של צוות התכנון ותכנית 3/124/03/3 לא נכללו בה. לכן הבדיקה שלמטה רחבה
+          יותר: היא מוסיפה את מה שהמצגת כבר נותנת.
+        </p>
+      </section>
+
+      <h3 className="mt-5 text-sm font-semibold">הבדיקה המורחבת: התוכנית והמצגת יחד</h3>
       {/* פס הסיכום: כל מדד הוא משבצת אחת */}
       <div className="mt-4 flex h-4 gap-px" aria-hidden>
         {METRICS.map((m) => (
@@ -83,11 +114,17 @@ export default function MetricsPanel() {
                     <p className="mt-1 text-base leading-relaxed">
                       <span className="bg-[#F4E9A8] px-1 font-semibold">הנחיה לאדריכל</span> {m.todo}
                     </p>
-                    {m.go && (
-                      <button className="btn no-print mt-2 px-3 py-1 text-xs" onClick={() => go(m.go!)} title="מציג את הנושא במודל שמימין">
-                        הצגה במודל
-                      </button>
+                    <p className="mt-1 text-sm leading-relaxed text-ink/70">
+                      <span className="font-semibold text-ink/80">ניקוד רשמי: </span>
+                      {OFFICIAL[m.id].s == null ? 'לא ניתן למדוד. ' : `${OFFICIAL[m.id].s} מתוך ${m.max}. `}
+                      {OFFICIAL[m.id].n}
+                    </p>
+                    {OFFICIAL[m.id].q && (
+                      <p className="mt-1 text-xs leading-relaxed text-ink/55">
+                        ראיה: "{OFFICIAL[m.id].q}" ({OFFICIAL[m.id].src})
+                      </p>
                     )}
+                    {m.go && <IconBtn icon="show" label="הצגה במודל" className="no-print mt-2" onClick={() => go(m.go!)} />}
                   </div>
                 </li>
               ))}
