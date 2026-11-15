@@ -16,7 +16,7 @@ export type Tone = 'ok' | 'part' | 'miss' | 'pro' | 'con' | 'idea' | 'ask' | 'pl
 export interface InsightItem {
   t: string; // הטענה, עד שורה
   d?: string; // ההסבר
-  ask?: string; // מה לדרוש מהאדריכל
+  ask?: string; // הנחיה לאדריכל
   tone?: Tone;
   ref?: string; // מקור
   go?: Go;
@@ -24,6 +24,7 @@ export interface InsightItem {
 
 export interface InsightBlock {
   h: string;
+  sub?: string;
   note?: string;
   numbered?: boolean;
   items: InsightItem[];
@@ -36,9 +37,10 @@ export interface InsightPanel {
   lead: string;
   blocks: InsightBlock[];
   source: string;
+  tabs?: boolean; // מיני-סרגל: בלוק אחד בכל פעם
 }
 
-export type PanelId = 'prep' | 'people' | 'status' | 'proscons' | 'ideas' | 'work';
+export type PanelId = 'prep' | 'people' | 'metrics' | 'status' | 'proscons' | 'ideas' | 'work';
 
 export const TONE_LABEL: Record<Tone, string> = {
   ok: 'קיים',
@@ -123,11 +125,13 @@ export const PANELS: InsightPanel[] = [
   {
     id: 'people',
     name: 'התאמה לאוכלוסיות',
+    tabs: true,
     title: 'התוכנית מתוכננת להולך הרגל, אבל לא במפורש לזקנים ולילדים',
     lead: 'בדקתי את המצגת מול שני התדריכים שבאפליקציות שלך: תכנון לעת זקנה (MUNI100) ותכנון ידידותי לילדים (URBAN95). בעמודים שקראתי אין התייחסות מפורשת לזקנים, לילדים או לתקן הנגישות. חלק מהדרישות מתקיימות בפועל, ורובן חסרות מידות.',
     blocks: [
       {
-        h: 'מבוגרים: תכנון לעת זקנה (MUNI100)',
+        h: 'מבוגרים',
+        sub: 'תכנון לעת זקנה (MUNI100)',
         note: `המקור לדרישות: ${AGE}.`,
         items: [
           { t: 'רצועת שתילה צמודה לרצועת ההליכה', d: 'במצגת: צמחייה מקומית חוצצת בין הכביש לשדרה, ובין שביל ההליכה לשביל האופניים.', tone: 'ok', ref: `${DECK}, עמ' 8. תדריך, עמ' 95`, go: { topic: 'planting', view: 'detail' } },
@@ -142,7 +146,8 @@ export const PANELS: InsightPanel[] = [
         ],
       },
       {
-        h: 'ילדים: תכנון בגובה 95 ס"מ (URBAN95)',
+        h: 'ילדים',
+        sub: 'תכנון בגובה 95 ס"מ (URBAN95)',
         note: 'המקור לדרישות: 12 עקרונות התכנון שבאפליקציה 95° Guide.',
         items: [
           { t: 'הפרדה פיזית בין תנועת רכב לילדים, ברוחב 3 מ\' לפחות', d: 'במצגת: רצועות גינון חוצצות בין הכביש לשדרה, ושביל האופניים מופרד. רוחב החיץ לא צוין.', ask: 'רוחב החיץ הירוק בכל חתך.', tone: 'ok', ref: `${DECK}, עמ' 8 ו-9`, go: { topic: 'water', view: 'detail' } },
@@ -157,15 +162,16 @@ export const PANELS: InsightPanel[] = [
         ],
       },
       {
-        h: 'מה לבקש מאדריכל הפרויקט',
+        h: 'הנחיות לאדריכל',
+        sub: 'שש דרישות להצגה בישיבה',
         numbered: true,
         items: [
-          { t: 'להוסיף לכל חתך רחוב מידות: רצועת הליכה, רצועת שירות, חיץ ירוק.', tone: 'ask' },
-          { t: 'פרק ריהוט עם דגם ספסל נגיש, פריסה כל 50 מ\', וישיבה למלווים ליד מוקדי משחק.', tone: 'ask' },
-          { t: 'פרק תאורה שמתואם עם העצים, כולל תאורה נמוכה בשבילים.', tone: 'ask' },
-          { t: 'פרק נגישות לפי תקן 1918: שיפועים, מעברים מוגבהים, משטחי אזהרה.', tone: 'ask' },
-          { t: 'חישוב צל לרצועות ההליכה ולאזורי המשחק.', tone: 'ask' },
-          { t: 'מסלול מעגלי של 1.5 ק"מ, עם ברזיות ושירותים ציבוריים.', tone: 'ask' },
+          { t: 'להוסיף לכל חתך רחוב מידות: רצועת הליכה, רצועת שירות, חיץ ירוק.', tone: 'plain' },
+          { t: 'פרק ריהוט עם דגם ספסל נגיש, פריסה כל 50 מ\', וישיבה למלווים ליד מוקדי משחק.', tone: 'plain' },
+          { t: 'פרק תאורה שמתואם עם העצים, כולל תאורה נמוכה בשבילים.', tone: 'plain' },
+          { t: 'פרק נגישות לפי תקן 1918: שיפועים, מעברים מוגבהים, משטחי אזהרה.', tone: 'plain' },
+          { t: 'חישוב צל לרצועות ההליכה ולאזורי המשחק.', tone: 'plain' },
+          { t: 'מסלול מעגלי של 1.5 ק"מ, עם ברזיות ושירותים ציבוריים.', tone: 'plain' },
         ],
       },
     ],

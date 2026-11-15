@@ -34,7 +34,7 @@ export default function StatusPanel() {
           <section key={g.status} className="mt-5">
             <h3 className="text-sm font-semibold">{g.h}</h3>
             <ul className="mt-2 space-y-1">
-              {group.map((t) => {
+              {group.map((t, gi) => {
                 const notes = t.items.map((i) => i.note).filter(Boolean);
                 const alt = t.items.find((i) => i.alternatives?.length);
                 const chosen = alt?.alternatives?.find((a) => a.id === alt.selectedAlternativeId);
@@ -49,6 +49,7 @@ export default function StatusPanel() {
                 return (
                   <ItemRow
                     key={t.id}
+                    n={gi + 1}
                     it={{
                       t: t.nameHe,
                       d,

@@ -11,6 +11,7 @@ import SpecAlternatives from './SpecAlternatives';
 import InsightPanelView from '../insight/InsightPanelView';
 import StatusPanel from '../insight/StatusPanel';
 import WorkPlan from '../insight/WorkPlan';
+import MetricsPanel from '../insight/MetricsPanel';
 
 export default function SpecPanel() {
   const { topic, item } = useSelection();
@@ -42,6 +43,8 @@ export default function SpecPanel() {
         <StatusPanel />
       ) : panel === 'work' ? (
         <WorkPlan />
+      ) : panel === 'metrics' ? (
+        <MetricsPanel />
       ) : panel ? (
         <InsightPanelView key={panel} id={panel} />
       ) : !topic || !item ? (

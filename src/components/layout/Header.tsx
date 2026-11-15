@@ -5,6 +5,7 @@ import Badge from '../ui/Badge';
 
 const BUTTONS: { id: PanelId; name: string }[] = [
   ...PANELS.filter((p) => p.id === 'prep' || p.id === 'people').map((p) => ({ id: p.id, name: p.name })),
+  { id: 'metrics', name: 'התאמה למדדים' },
   { id: 'status', name: 'מה בוצע' },
   ...PANELS.filter((p) => p.id === 'proscons' || p.id === 'ideas').map((p) => ({ id: p.id, name: p.name })),
   { id: 'work', name: 'תוכנית עבודה' },
