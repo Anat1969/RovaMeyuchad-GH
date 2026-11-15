@@ -8,6 +8,8 @@ import ContextLayer from './ContextLayer';
 import PublicLots from './PublicLots';
 import { IconBtn } from '../ui/Icon';
 import { DESIGNS } from '../../data/designData';
+import AnalysisLayer from './AnalysisLayer';
+import { sunVector, type Analysis } from '../../analysis/engine';
 import { CONTEXT } from '../../data/contextData';
 import { usePlanStore, useSelection } from '../../store/planStore';
 import type { CameraView } from '../../types/plan';
@@ -116,16 +118,19 @@ function RealLight() {
     cam.far = 2200;
     cam.updateProjectionMatrix();
   }, []);
+  const analysis = usePlanStore((s) => s.analysis);
+  const ap = usePlanStore((s) => s.analysisParams);
+  const dir = useMemo(() => (analysis === 'shade' ? new THREE.Vector3(...sunVector(ap.season, ap.hour)).normalize() : SUN), [analysis, ap.season, ap.hour]);
   useFrame(() => {
     const l = light.current;
     if (!l || !controls) return;
-    l.position.copy(controls.target).addScaledVector(SUN, 1000);
+    l.position.copy(controls.target).addScaledVector(dir, 1000);
     l.target.position.copy(controls.target);
     l.target.updateMatrixWorld();
   });
   return (
     <>
-      <Sky distance={40000} sunPosition={SUN.toArray()} turbidity={5} rayleigh={1.4} mieCoefficient={0.006} mieDirectionalG={0.8} />
+      <Sky distance={40000} sunPosition={dir.toArray()} turbidity={5} rayleigh={1.4} mieCoefficient={0.006} mieDirectionalG={0.8} />
       <fog attach="fog" args={['#DCE6EE', 2500, 22000]} />
       <hemisphereLight args={['#DDEBFA', '#B7A486', 1.15]} />
       <directionalLight
@@ -159,6 +164,13 @@ function Tone({ real }: { real: boolean }) {
   return null;
 }
 
+const ANALYSES: { id: Analysis; name: string; hint: string }[] = [
+  { id: 'shade', name: 'הצללות', hint: 'צל לאורך היום' },
+  { id: 'wind', name: 'רוח', hint: 'רוח בין הבניינים' },
+  { id: 'water', name: 'ניקוז', hint: 'לאן הנגר זורם' },
+  { id: 'heat', name: 'חום', hint: 'מפת חום' },
+];
+
 const RENDERS = [
   { src: '/renders/path-seating.jpg', name: 'שביל חוצה רובע עם מקומות ישיבה' },
   { src: '/renders/path-evening.jpg', name: 'שביל, גינון ושביל אופניים' },
@@ -176,6 +188,9 @@ export default function Viewport3D() {
   const setRender = usePlanStore((s) => s.setRenderMode);
   const lightbox = usePlanStore((s) => s.lightbox);
   const setLightbox = usePlanStore((s) => s.setLightbox);
+  const analysis = usePlanStore((s) => s.analysis);
+  const setAnalysis = usePlanStore((s) => s.setAnalysis);
+  const [gallery, setGallery] = useState(true);
   const real = render === 'real';
   const massMode = usePlanStore((s) => s.massMode);
   const setMassMode = usePlanStore((s) => s.setMassMode);
@@ -229,28 +244,50 @@ export default function Viewport3D() {
         <ContextLayer />
         <QuarterModel />
         <PublicLots />
+        <AnalysisLayer />
         <PlanLayers />
       </Canvas>
 
       {/* סרגל כלים אנכי, באייקונים: הדמיה, מודל, מבט, רקע וזום. התווית בריחוף */}
       <div className="no-print absolute left-3 top-3 flex flex-col gap-1 bg-white/90 p-1 shadow-md" role="toolbar" aria-label="כלי ההדמיה">
-        <IconBtn icon="model" label="הדמיית מודל: צבעי המקרא" on={!real} onClick={() => setRender('model')} />
-        <IconBtn icon="real" label="הדמיה ריאליסטית: שמש, צללים ותצלום אוויר" on={real} onClick={() => setRender('real')} />
+        <IconBtn icon="model" label="הדמיית מודל" on={!real} onClick={() => setRender('model')} />
+        <IconBtn icon="real" label="הדמיה ריאליסטית" on={real} onClick={() => setRender('real')} />
         <span className="my-0.5 h-px bg-ink/15" />
-        <IconBtn icon="rights" label='מודל הזכויות: המעטפת המרבית לפי התב"ע' on={massMode === 'rights'} onClick={() => setMassMode('rights')} />
-        <IconBtn icon="design" label="מודל התכנון: הבניינים לפי תכנון האדריכל" on={massMode === 'design'} onClick={() => setMassMode('design')} />
+        <IconBtn icon="rights" label="מודל זכויות" on={massMode === 'rights'} onClick={() => setMassMode('rights')} />
+        <IconBtn icon="design" label="מודל תכנון" on={massMode === 'design'} onClick={() => setMassMode('design')} />
         <span className="my-0.5 h-px bg-ink/15" />
-        <IconBtn icon="top" label="תצוגה עילית" on={viewName === 'top'} onClick={() => setView('top')} />
+        <IconBtn icon="top" label="מבט על" on={viewName === 'top'} onClick={() => setView('top')} />
         <IconBtn icon="perspective" label="פרספקטיבה" on={viewName === 'perspective'} onClick={() => setView('perspective')} />
-        <IconBtn icon="street" label="תצוגת רחוב" on={viewName === 'street'} onClick={() => setView('street')} />
+        <IconBtn icon="street" label="מבט רחוב" on={viewName === 'street'} onClick={() => setView('street')} />
         <span className="my-0.5 h-px bg-ink/15" />
-        <IconBtn icon="map" label="רקע: סכמת רחובות" on={!real && mode === 'schematic'} disabled={real} onClick={() => setMode('schematic')} />
-        <IconBtn icon="satellite" label="רקע: תצלום לוויין" on={real || mode === 'satellite'} disabled={real} onClick={() => setMode('satellite')} />
+        <IconBtn icon="map" label="רקע רחובות" on={!real && mode === 'schematic'} disabled={real} onClick={() => setMode('schematic')} />
+        <IconBtn icon="satellite" label="רקע לוויין" on={real || mode === 'satellite'} disabled={real} onClick={() => setMode('satellite')} />
         <IconBtn icon="none" label="בלי רקע" on={!real && mode === 'none'} disabled={real} onClick={() => setMode('none')} />
         <span className="my-0.5 h-px bg-ink/15" />
-        <IconBtn icon="box" label="זום למלבן: סמני מלבן על קטע רחוב" on={boxMode} onClick={() => setBoxMode((b) => !b)} />
+        <IconBtn icon="box" label="זום למלבן" on={boxMode} onClick={() => setBoxMode((b) => !b)} />
         <IconBtn icon="zoomIn" label="התקרבות" onClick={() => zoomBy(1)} />
         <IconBtn icon="zoomOut" label="התרחקות" onClick={() => zoomBy(-1)} />
+        {real && (
+          <>
+            <span className="my-0.5 h-px bg-ink/15" />
+            <IconBtn icon="image" label="הדמיות המתכננים" on={gallery} onClick={() => setGallery((g) => !g)} />
+          </>
+        )}
+      </div>
+
+      {/* כלי הניתוח: מפה על הקרקע, תנועה על המודל, והמלצות בלוח */}
+      <div className="no-print absolute left-14 top-3 flex gap-1 bg-white/90 p-1 shadow-md" role="group" aria-label="כלי ניתוח">
+        {ANALYSES.map((x) => (
+          <button
+            key={x.id}
+            title={x.hint}
+            aria-pressed={analysis === x.id}
+            onClick={() => setAnalysis(analysis === x.id ? null : x.id)}
+            className={`btn w-16 px-1 py-1.5 text-xs ${analysis === x.id ? 'btn-on' : ''}`}
+          >
+            {x.name}
+          </button>
+        ))}
       </div>
 
       {/* שכבת הסימון של כלי הזום למלבן */}
@@ -295,12 +332,15 @@ export default function Viewport3D() {
       )}
 
       {/* הדמיות צוות התכנון: התמונות הריאליסטיות באמת, לצד הדמיית הזמן-אמת */}
-      {real && (
+      {real && gallery && (
         <div className="no-print absolute bottom-20 left-14 bg-white/90 p-2 shadow-md">
-          <p className="mb-1 text-xs font-semibold">הדמיות צוות התכנון, מתוך המצגת</p>
+          <div className="mb-1 flex items-center gap-2">
+            <p className="flex-1 text-xs font-semibold">הדמיות צוות התכנון, מתוך המצגת</p>
+            <IconBtn icon="close" label="סגירה" className="!h-6 !w-6" onClick={() => setGallery(false)} />
+          </div>
           <div className="flex gap-1">
             {RENDERS.map((r) => (
-              <button key={r.src} title={`${r.name}. לחיצה מגדילה`} onClick={() => setLightbox(r.src)} className="block hover:shadow-lg">
+              <button key={r.src} title="הגדלה" onClick={() => setLightbox(r.src)} className="block hover:shadow-lg">
                 <img src={r.src} alt={r.name} className="h-20 w-32 object-cover" />
               </button>
             ))}
@@ -308,21 +348,22 @@ export default function Viewport3D() {
         </div>
       )}
       {lightbox && (
-        <button
-          className="no-print absolute inset-0 z-20 flex items-center justify-center bg-black/80 p-6"
-          onClick={() => setLightbox(null)}
-          title="לחיצה סוגרת"
-        >
+        <div className="no-print absolute inset-0 z-20 flex items-center justify-center bg-black/80 p-6" onClick={() => setLightbox(null)}>
           <img src={lightbox} alt={RENDERS.find((r) => r.src === lightbox)?.name ?? ''} className="max-h-full max-w-full shadow-2xl" />
-          <span className="absolute bottom-4 right-4 bg-white px-2 py-1 text-xs">
-            {RENDERS.find((r) => r.src === lightbox)?.name}. מקור: מצגת צוות התכנון. לחיצה סוגרת.
+          <span className="absolute left-4 top-4">
+            <IconBtn icon="close" label="סגירה" className="!h-10 !w-10 !bg-white" onClick={() => setLightbox(null)} />
           </span>
-        </button>
+          <span className="absolute bottom-4 right-4 bg-white px-2 py-1 text-xs">{RENDERS.find((r) => r.src === lightbox)?.name}. מקור: מצגת צוות התכנון.</span>
+        </div>
       )}
 
       {/* מה מוצג, ומה מקור הגיאומטריה */}
-      <div className="pointer-events-none absolute right-3 top-3 hidden max-w-[55%] bg-white/85 px-2 py-1 text-xs text-ink/75 md:block">
-        {massMode === 'design' ? (
+      <div className="pointer-events-none absolute right-3 top-3 hidden max-w-[42%] bg-white/85 px-2 py-1 text-xs text-ink/75 md:block">
+        {analysis ? (
+          <>
+            <span className="font-semibold">ניתוח {ANALYSES.find((x) => x.id === analysis)!.name}.</span> מודל מפושט להמחשה, על מעטפות הזכויות.
+          </>
+        ) : massMode === 'design' ? (
           <>
             <span className="font-semibold">מודל התכנון.</span> הועלו מודלי אדריכל ל-{DESIGNS.length} מגרשים. לשאר מוצג קו המעטפת המותרת בלבד.
           </>
@@ -345,7 +386,9 @@ export default function Viewport3D() {
 
       {/* שורת הסבר: מה אומר כל סימן */}
       <div className="pointer-events-none absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-x-5 gap-y-1 bg-white/80 px-2 py-1 text-xs text-ink/75">
-        {real ? (
+        {analysis ? (
+          <span>המפה על הקרקע מראה את תוצאת הניתוח. המקרא וההמלצות בלוח שמשמאל.</span>
+        ) : real ? (
           <span>שמש וצללים מחושבים בזמן אמת. לתמונה ריאליסטית מלאה: ההדמיות של צוות התכנון, משמאל.</span>
         ) : development ? (
           <>

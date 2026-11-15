@@ -32,7 +32,7 @@ export default function TopicSidebar() {
     <nav aria-label="נושאי התוכנית" className="no-print flex h-12 shrink-0 items-stretch gap-1 overflow-x-auto bg-ink/[0.05] px-2 py-1 md:px-6">
       <button
         aria-pressed={allOn}
-        title="כל שכבות התוכנית יחד"
+        title="כל השכבות יחד"
         onClick={() => {
           setPanel(null);
           go({ topic: null });
@@ -51,7 +51,7 @@ export default function TopicSidebar() {
               go({ topic: on ? null : t.id });
             }}
             aria-pressed={on}
-            title={`${t.nameHe}: ${STATUS_LABEL[t.status]}`}
+            title={`השכבות של ${t.nameHe}. ${STATUS_LABEL[t.status]}`}
             className={cls(on)}
             style={{ boxShadow: on ? `inset 0 -4px 0 ${t.layerColor ?? '#fff'}, 0 4px 10px rgba(46,46,43,.25)` : undefined }}
           >

@@ -50,6 +50,13 @@ const P: Record<string, ReactNode> = {
       <path d="m21 21-2.5-2.5" />
     </>
   ),
+  image: (
+    <>
+      <rect x="3" y="4" width="18" height="16" />
+      <path d="m3 16 5-5 4 4 3-3 6 6" />
+      <circle cx="9" cy="9" r="1.5" />
+    </>
+  ),
   zoomOut: (
     <>
       <circle cx="11" cy="11" r="7" />

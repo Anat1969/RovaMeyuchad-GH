@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { completionStats, usePlanStore } from '../../store/planStore';
-import { DECK_NAME, DECK_URL, PANELS, type PanelId } from '../../data/insights';
+import { DECK_URL, PANELS, type PanelId } from '../../data/insights';
 import Badge from '../ui/Badge';
+
+const HINT: Record<string, string> = {
+  prep: 'עמדה, פערים ושאלות לישיבה',
+  people: 'התאמה לזקנים ולילדים',
+  metrics: '44 מדדי שכונה 360',
+  status: 'אילו פרקים הוגשו',
+  proscons: 'חוזקות וסיכונים',
+  ideas: 'צעדים לשיפור',
+  work: 'משימות ותאריכים',
+};
 
 const BUTTONS: { id: PanelId; name: string }[] = [
   ...PANELS.filter((p) => p.id === 'prep' || p.id === 'people').map((p) => ({ id: p.id, name: p.name })),
@@ -35,7 +45,7 @@ export default function Header() {
     <header className="no-print flex h-14 shrink-0 items-center gap-3 bg-white px-3 shadow-[0_1px_0_#E7E2DA] md:px-6">
       <button
         className="shrink-0 truncate text-right text-lg font-light text-ink hover:opacity-70"
-        title="חזרה למבט הכולל"
+        title="מבט כולל"
         onClick={() => {
           setPanel(null);
           selectTopic(null);
@@ -54,6 +64,7 @@ export default function Header() {
           <button
             key={b.id}
             aria-pressed={panel === b.id}
+            title={HINT[b.id]}
             onClick={() => setPanel(panel === b.id ? null : b.id)}
             className={`btn shrink-0 whitespace-nowrap px-3 py-2 text-sm ${panel === b.id ? 'btn-on shadow-md' : ''}`}
           >
@@ -67,7 +78,7 @@ export default function Header() {
         href={DECK_URL}
         target="_blank"
         rel="noreferrer"
-        title={`${DECK_NAME}. נפתחת בלשונית חדשה`}
+        title="מצגת המתכננים"
       >
         המצגת
       </a>
@@ -77,7 +88,7 @@ export default function Header() {
           className={`btn h-9 w-9 font-semibold ${isEditMode ? 'btn-on' : ''}`}
           aria-haspopup="menu"
           aria-expanded={open}
-          title="תפריט: עריכה ומערכת"
+          title="עריכה ואיפוס"
           onClick={() => setOpen((o) => !o)}
         >
           ר3

@@ -6,7 +6,19 @@ import { IconBtn } from '../ui/Icon';
  * מעטפת לכל לוח תובנות: כותרת, פעולות (הדפסה, העתקה, מייל) ותוכן.
  * הטקסט לשליחה נלקח מהתוכן עצמו, כך שמה שמודפס ומה שנשלח זהים למה שמוצג.
  */
-export default function PanelShell({ name, title, lead, children }: { name: string; title: string; lead?: string; children: ReactNode }) {
+export default function PanelShell({
+  name,
+  title,
+  lead,
+  children,
+  onClose,
+}: {
+  name: string;
+  title: string;
+  lead?: string;
+  children: ReactNode;
+  onClose?: () => void;
+}) {
   const setPanel = usePlanStore((s) => s.setPanel);
   const body = useRef<HTMLDivElement>(null);
   const [msg, setMsg] = useState('');
@@ -41,10 +53,10 @@ export default function PanelShell({ name, title, lead, children }: { name: stri
     <div className="fade-in">
       <div className="no-print mb-3 flex flex-wrap items-center gap-1">
         <span className="flex-1 text-sm font-semibold">{name}</span>
-        <IconBtn icon="print" label="הדפסה: רק הטקסט שבלוח הזה" onClick={() => window.print()} />
-        <IconBtn icon="copy" label="העתקת הטקסט" onClick={copy} />
+        <IconBtn icon="print" label="הדפסה" onClick={() => window.print()} />
+        <IconBtn icon="copy" label="העתקה" onClick={copy} />
         <IconBtn icon="mail" label="שליחה במייל" onClick={mail} />
-        <IconBtn icon="close" label="סגירת הלוח" onClick={() => setPanel(null)} />
+        <IconBtn icon="close" label="סגירה" onClick={onClose ?? (() => setPanel(null))} />
         <span className="w-full text-xs text-done" aria-live="polite">
           {msg}
         </span>

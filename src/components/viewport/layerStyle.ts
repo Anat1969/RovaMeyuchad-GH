@@ -32,7 +32,16 @@ export function resolveStyle(
   const ghost = !item || item.status === 'pending' || !entry;
   const natural = piece.fixed ?? entry?.color ?? layerColor;
 
-  if (real) return { color: ghost ? (piece.fixed ?? '#8D8B86') : natural, opacity: 1, ghost: false };
+  if (piece.layer === 'road') return { color: natural, opacity: 1, ghost: false };
+  if (real) {
+    const dev = activeTopicId !== null && activeTopicId !== 'massing' && activeTopicId !== 'public';
+    // בלי נושא: הכול במראה הטבעי, ופרק חסר באפור. עם נושא: השכבה שלו בצבעיה, והשאר נסוגות
+    if (!dev) return { color: ghost ? (piece.fixed ?? '#8D8B86') : natural, opacity: 1, ghost: false };
+    if (activeTopicId !== piece.layer) return { color: '#B5B2AB', opacity: 0.22, ghost: false };
+    if (ghost) return { color: layerColor, opacity: 1, ghost: false };
+    const hit = !focus || (focus.itemId === piece.item && focus.idx === (piece.idx ?? -1));
+    return { color: natural, opacity: hit ? 1 : 0.15, ghost: false };
+  }
 
   // בלי נושא, או בנושא הבינוי: הכול בצבעו הטבעי, והחסר בקווי מתאר
   if (!activeTopicId || activeTopicId === 'massing') {

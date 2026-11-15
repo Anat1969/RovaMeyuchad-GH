@@ -6,6 +6,7 @@ import { PUBLIC } from '../data/publicData';
 const PUBLIC_NUMS = new Set(PUBLIC.lots.map((l) => l.num));
 import { PLAN_TOPICS, withAlternative } from '../data/planData';
 import { SEED_TASKS, type Go, type PanelId } from '../data/insights';
+import type { Analysis, Params } from '../analysis/engine';
 
 /** משימה בתוכנית העבודה */
 export interface WorkTask {
@@ -17,6 +18,7 @@ export interface WorkTask {
 }
 
 export type RenderMode = 'model' | 'real';
+export type { Analysis } from '../analysis/engine';
 
 const seedTasks = (): WorkTask[] =>
   SEED_TASKS.map((t, i) => ({ id: `seed-${i}`, date: '', topic: t.topic, text: t.text, done: false }));
@@ -43,6 +45,9 @@ interface PlanState {
   panel: PanelId | null; // לוח התובנות שפתוח בצד
   tasks: WorkTask[];
   lightbox: string | null;
+  analysis: Analysis | null; // כלי הניתוח הפעיל: הצללות, רוח, ניקוז או חום
+  analysisParams: Params;
+  sunPlaying: boolean;
   savedAt: number;
 
   selectTopic: (id: string | null, itemId?: string) => void;
@@ -63,6 +68,9 @@ interface PlanState {
   setMassMode: (m: MassMode) => void;
   setPanel: (p: PanelId | null) => void;
   setLightbox: (src: string | null) => void;
+  setAnalysis: (a: Analysis | null) => void;
+  setAnalysisParams: (p: Partial<Params>) => void;
+  setSunPlaying: (b: boolean) => void;
   /** קישור מתובנה אל המודל: בוחר נושא, פריט וחלופה. המצלמה לא זזה: המבט נשאר של המשתמשת */
   go: (g: Go) => void;
   addTask: (t: Omit<WorkTask, 'id' | 'done'>) => void;
@@ -97,6 +105,9 @@ export const usePlanStore = create<PlanState>()(
       panel: null,
       tasks: seedTasks(),
       lightbox: null,
+      analysis: null,
+      analysisParams: { season: 'summer', hour: 10, windFrom: 315, day: false },
+      sunPlaying: true,
       savedAt: 0,
 
       selectTopic: (id, itemId) =>
@@ -200,8 +211,11 @@ export const usePlanStore = create<PlanState>()(
       setContextMode: (m) => set({ contextMode: m }),
       setRenderMode: (m) => set({ renderMode: m }),
       setMassMode: (m) => set({ massMode: m }),
-      setPanel: (p) => set({ panel: p }),
+      setPanel: (p) => set({ panel: p, ...(p && { analysis: null }) }),
       setLightbox: (src) => set({ lightbox: src }),
+      setAnalysis: (a) => set({ analysis: a, ...(a && { panel: null }) }),
+      setSunPlaying: (b) => set({ sunPlaying: b }),
+      setAnalysisParams: (p) => set((s) => ({ analysisParams: { ...s.analysisParams, ...p } })),
       go: (g) =>
         set((s) => {
           let topics = s.topics;
@@ -214,6 +228,7 @@ export const usePlanStore = create<PlanState>()(
           return {
             topics,
             legendFocus: null,
+            ...(g.topic !== undefined && { analysis: null }),
             ...(topic !== undefined && {
               selectedTopicId: topic?.id ?? null,
               selectedItemId: topic ? (g.item ?? topic.items[0]?.id ?? null) : null,

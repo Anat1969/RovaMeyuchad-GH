@@ -9,7 +9,8 @@ import { resolveStyle, type PieceRef } from './layerStyle';
 /**
  * שכבות הפיתוח על רחובות התוכנית עצמה.
  * הרחובות אמיתיים (קטעים שלצד המגרשים). המיקום של כל רכיב לאורכם סכמטי:
- * רצועות הליכה, שירות וחנייה, רצועת ביוסוואל, עץ כל 6 מ', עמוד תאורה כל 30 מ', ספסל כל 60 מ'.
+ * המרווחים לפי הדרישות שב-data/rules.ts: עץ כל 6 מ', פתח נטיעה 1.2 על 2.4 מ',
+ * עמוד תאורה 3 מ' מגזע, וספסל כל 48 מ' בכל צד.
  */
 
 type Shape = 'box' | 'sphere' | 'cone' | 'cyl';
@@ -91,12 +92,14 @@ function build() {
           const mid: Pt = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
           add({ layer: 'planting', item: 'groundcover', idx: (i + ri * 2 + shift * 3) % 5 }, 'sphere', mid, 0.3, [0.55, 0.35, 0.55]);
         }
-        if (i % 5 === 2) {
-          const l = lamps[i];
+        // עמוד תאורה כל 30 מ', באמצע בין שני עצים: 3 מ' מכל גזע
+        if (i % 5 === 2 && i + 1 < lamps.length) {
+          const l: Pt = [(lamps[i][0] + lamps[i + 1][0]) / 2, (lamps[i][1] + lamps[i + 1][1]) / 2];
           add({ layer: 'lighting', item: 'lighting-main', idx: 0 }, 'cyl', l, 2.6, [0.1, 5.2, 0.1]);
           add({ layer: 'lighting', item: 'lighting-main', idx: 0 }, 'box', l, 5.2, [0.5, 0.16, 1.6], ang[i]);
         }
-        if (i % 10 === 5 && side > 0) {
+        // ספסל כל 48 מ' בכל צד, לסירוגין בין הצדדים
+        if ((i + (side > 0 ? 0 : 4)) % 8 === 4) {
           add({ layer: 'furniture', item: 'furniture-main', idx: 0 }, 'box', seats[i], 0.45, [1.8, 0.45, 0.5], ang[i]);
           if (i + 1 < seats.length) add({ layer: 'furniture', item: 'furniture-main', idx: 1 }, 'cyl', seats[i + 1], 0.55, [0.24, 0.8, 0.24]);
         }

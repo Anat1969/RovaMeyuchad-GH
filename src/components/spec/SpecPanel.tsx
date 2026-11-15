@@ -14,6 +14,7 @@ import InsightPanelView from '../insight/InsightPanelView';
 import StatusPanel from '../insight/StatusPanel';
 import WorkPlan from '../insight/WorkPlan';
 import MetricsPanel from '../insight/MetricsPanel';
+import AnalysisPanel from '../insight/AnalysisPanel';
 
 export default function SpecPanel() {
   const { topic, item } = useSelection();
@@ -22,6 +23,7 @@ export default function SpecPanel() {
   const selectTopic = usePlanStore((s) => s.selectTopic);
   const addItem = usePlanStore((s) => s.addItem);
   const panel = usePlanStore((s) => s.panel);
+  const analysis = usePlanStore((s) => s.analysis);
 
   const newItem = () => {
     if (!topic) return;
@@ -41,7 +43,9 @@ export default function SpecPanel() {
       aria-label="מפרט"
       className="print-root min-h-0 flex-1 overflow-y-auto bg-white p-4 shadow-[-1px_0_0_#E7E2DA_inset] md:h-full md:flex-1 md:p-6"
     >
-      {panel === 'status' ? (
+      {analysis ? (
+        <AnalysisPanel key={analysis} a={analysis} />
+      ) : panel === 'status' ? (
         <StatusPanel />
       ) : panel === 'work' ? (
         <WorkPlan />
@@ -56,7 +60,7 @@ export default function SpecPanel() {
           <div className="mb-4 flex items-center gap-2">
             <span className="h-3 w-3" style={{ background: topic.layerColor }} />
             <span className="flex-1 text-sm font-semibold">{topic.nameHe}</span>
-            <IconBtn icon="home" label="חזרה למבט הכולל" onClick={() => selectTopic(null)} />
+            <IconBtn icon="home" label="כל הנושאים" onClick={() => selectTopic(null)} />
           </div>
 
           {topic.id !== 'massing' && topic.id !== 'public' && (topic.items.length > 1 || isEditMode) && (
