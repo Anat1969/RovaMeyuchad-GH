@@ -1,4 +1,17 @@
-import type { PlanTopic } from '../types/plan';
+import type { PlanTopic, SpecItem } from '../types/plan';
+
+/** פריט עם חלופות: התמונה והמקרא נגזרים מהחלופה שנבחרה */
+export function withAlternative(item: SpecItem, altId = item.selectedAlternativeId): SpecItem {
+  const alt = item.alternatives?.find((a) => a.id === altId) ?? item.alternatives?.[0];
+  if (!alt) return item;
+  return {
+    ...item,
+    selectedAlternativeId: alt.id,
+    image: alt.image,
+    imageCredit: undefined,
+    legend: alt.colorZones.map((z) => ({ color: z.color, label: z.label })),
+  };
+}
 
 // נתוני ברירת מחדל: מבוסס על תוכנית הבינוי של הרובע המיוחד אשדוד
 export const PLAN_TOPICS: PlanTopic[] = [
@@ -42,33 +55,106 @@ export const PLAN_TOPICS: PlanTopic[] = [
     layerColor: '#E8DCC8',
     sortOrder: 1,
     items: [
-      {
+      withAlternative({
         id: 'paving-main',
-        nameHe: 'ריצוף רחוב ראשי',
-        description: 'פורפירו שפוך — השראת חולות אשדוד. 280 ₪/מ"ר',
-        image: '/img/porphyry.jpg',
-        imageCredit: "Nino Barbieri, CC BY 2.5, Wikimedia Commons",
-        legend: [
-          { color: '#E8DCC8', label: 'פורפירו בהיר — רחוב ראשי' },
-          { color: '#C4A882', label: 'פורפירו כהה — גדה ומסגרת' },
-          { color: '#8B6F4E', label: 'גרניט — פס מוליך' },
-        ],
+        nameHe: 'ריצוף רחובות',
+        description: 'שלוש חלופות צבע וחומר לחתך הרחוב, לבחירת אדריכלית העיר.',
+        legend: [],
         status: 'complete',
-        specRef: 'עמ\' 8–12',
-      },
-      {
-        id: 'paving-secondary',
-        nameHe: 'ריצוף רחוב משני',
-        description: 'ריצוף מגורים — 110 ₪/מ"ר',
-        image: '/img/pavers.jpg',
-        imageCredit: "Anasskoko, CC BY-SA 4.0, Wikimedia Commons",
-        legend: [
-          { color: '#D4C8B0', label: 'ריצוף מגורים — גוון חול' },
-          { color: '#B8A898', label: 'אבן מקומית — מסגרת' },
+        specRef: "מצגת שפת רחוב ושצ\"פ, עמ' 14 עד 19",
+        selectedAlternativeId: 'street-1',
+        alternatives: [
+          {
+            id: 'street-1',
+            label: 'חלופה 1',
+            title: "צהוב: אומבריאנו בז'",
+            image: '/alternatives/street-1.jpg',
+            description: 'רצועת הליכה במלבן וריבוע טוסקנה, עובי 6 ס"מ. רצועת שירות באבן רמות, עובי 7 ס"מ. בנייה ריבועית.',
+            cost: 'כ-220 ₪ למ"ר',
+            costLevel: 3,
+            streets: 'רחובות ראשיים',
+            colorZones: [
+              { zoneId: 'walk', color: '#CDC0AD', label: "רצועת הליכה: אומבריאנו, גוון גרניט בז'" },
+              { zoneId: 'service', color: '#F3E5D2', label: 'רצועת שירות: אקרסטון מסותת, גוון לבן השלום' },
+              { zoneId: 'parking', color: '#9A9390', label: 'חניית רכבים: אבן טבעון, גוון אפור' },
+            ],
+          },
+          {
+            id: 'street-2',
+            label: 'חלופה 2',
+            title: 'צהוב: קוקטייל דיונה',
+            image: '/alternatives/street-2.jpg',
+            description: 'רצועת הליכה באבן לינארית 16 על 24, עובי 7 ס"מ. רצועת שירות באבן לינארית 8 על 16. בנייה מלבנית.',
+            cost: 'כ-110 ₪ למ"ר',
+            costLevel: 1,
+            streets: 'רחובות מגורים',
+            colorZones: [
+              { zoneId: 'walk', color: '#CBB287', label: 'רצועת הליכה: אבן לינארית, גוון קוקטייל דיונה' },
+              { zoneId: 'service', color: '#E7D0AF', label: 'רצועת שירות: אבן לינארית, גוון לבן השלום' },
+              { zoneId: 'parking', color: '#9A9390', label: 'רצועת חנייה: אבן טבעון, גוון אפור' },
+            ],
+          },
+          {
+            id: 'street-3',
+            label: 'חלופה 3',
+            title: 'אדום: סופר אפרסק מלוטש',
+            image: '/alternatives/street-3.jpg',
+            description: 'רצועת הליכה באבן לינארית 16 על 24, עובי 7 ס"מ. רצועת שירות כהה באבן רמות. בנייה ריבועית.',
+            cost: 'כ-195 ₪ למ"ר',
+            costLevel: 2,
+            streets: 'רחובות ראשיים',
+            note: 'בשקף כתוב "רחובות ראשיים", אבל במפה הקטנה מסומנים רחובות המגורים. לברר מול המתכננים.',
+            colorZones: [
+              { zoneId: 'walk', color: '#DEC0B1', label: 'רצועת הליכה: אקרסטון מלוטש, גוון סופר אפרסק' },
+              { zoneId: 'service', color: '#686262', label: 'רצועת שירות: אקרסטון מסותת, גוון שחור בזלתי' },
+              { zoneId: 'parking', color: '#9A9390', label: 'רצועת חנייה: אבן טבעון, גוון אפור' },
+            ],
+          },
         ],
-        status: 'complete',
-        specRef: 'עמ\' 13–15',
-      },
+      }),
+      withAlternative({
+        id: 'paving-paths',
+        nameHe: 'שבילים חוצי רובע',
+        description: 'מערכת השבילים שמלווה את הולך הרגל ברחבי הרובע. שלוש חלופות לריצוף השביל.',
+        legend: [],
+        status: 'partial',
+        note: 'חלופה 2 מסומנת במצגת "בעבודה". מיקום השבילים עוד לא הוזן למודל, ולכן הצביעה מוצגת כאן בלבד.',
+        specRef: "מצגת שפת רחוב ושצ\"פ, עמ' 7 עד 13",
+        selectedAlternativeId: 'path-1',
+        alternatives: [
+          {
+            id: 'path-1',
+            label: 'חלופה 1',
+            title: 'שביל אבן פוליגונלית',
+            image: '/alternatives/path-1.jpg',
+            description: 'אבן דגם "פוליגונלית", עובי 7 ס"מ, סט של 3 יחידות.',
+            cost: 'כ-280 ₪ למ"ר',
+            costLevel: 3,
+            colorZones: [{ zoneId: 'path', color: '#CEC1AE', label: "שביל: אומבריאנו, גוון גרניט בז'" }],
+          },
+          {
+            id: 'path-2',
+            label: 'חלופה 2',
+            title: 'שביל אבן טבעית',
+            image: '/alternatives/path-2.jpg',
+            description: 'אבן טבעית בשלוש אפשרויות: Yello Rose, BH, YR Flamed.',
+            cost: 'כ-220 ₪ למ"ר',
+            costLevel: 3,
+            note: 'מסומנת במצגת "בעבודה".',
+            colorZones: [{ zoneId: 'path', color: '#D8C8C1', label: 'שביל: אבן טבעית' }],
+          },
+          {
+            id: 'path-3',
+            label: 'חלופה 3',
+            title: 'שביל פסיפס, ריצוף ריבועי קטן',
+            image: '/alternatives/path-3.jpg',
+            description: 'אבן רמות, עובי 7 ס"מ, סט של 8 אבנים.',
+            cost: 'כ-150 ₪ למ"ר',
+            costLevel: 2,
+            colorZones: [{ zoneId: 'path', color: '#C8B196', label: 'שביל: סופרסטון, גוון קוקטייל דיונה' }],
+          },
+        ],
+      }),
     ],
   },
   {
@@ -97,7 +183,8 @@ export const PLAN_TOPICS: PlanTopic[] = [
           { color: '#6B9E6B', label: 'ברוש עמודי', latinName: 'Cupressus sempervirens', image: '/img/cypress.jpg', credit: "Krzysztof Ziarnek, Kenraiz, CC BY-SA 4.0, Wikimedia Commons" },
         ],
         status: 'complete',
-        specRef: 'עמ\' 16–18',
+        note: 'במצגת מופיעה על הפרק חותמת "יעודכן בתכנון מפורט".',
+        specRef: "מצגת שפת רחוב ושצ\"פ, עמ' 24 עד 26",
       },
       {
         id: 'groundcover',
@@ -113,7 +200,8 @@ export const PLAN_TOPICS: PlanTopic[] = [
           { color: '#D8F0D8', label: 'לענה', latinName: 'Artemisia arborescens', image: '/img/artemisia.jpg', credit: "Krzysztof Ziarnek, Kenraiz, CC BY-SA 4.0, Wikimedia Commons" },
         ],
         status: 'complete',
-        specRef: 'עמ\' 19–20',
+        note: 'במצגת מופיעה על הפרק חותמת "יעודכן בתכנון מפורט".',
+        specRef: "מצגת שפת רחוב ושצ\"פ, עמ' 23",
       },
     ],
   },
@@ -138,7 +226,7 @@ export const PLAN_TOPICS: PlanTopic[] = [
         legend: [],
         status: 'pending',
         note: 'פרק תאורה — חותמת "להשלמה" (עמ\' 21)',
-        specRef: 'עמ\' 21',
+        specRef: "מצגת שפת רחוב ושצ\"פ, עמ' 21",
       },
     ],
   },
@@ -162,7 +250,7 @@ export const PLAN_TOPICS: PlanTopic[] = [
         legend: [],
         status: 'pending',
         note: '"יעודכן בתכנון מפורט" — טרם נקבע',
-        specRef: 'עמ\' 23',
+        specRef: "מצגת שפת רחוב ושצ\"פ, עמ' 20",
       },
     ],
   },
@@ -186,7 +274,7 @@ export const PLAN_TOPICS: PlanTopic[] = [
         legend: [],
         status: 'pending',
         note: 'פרק פתחי נטיעה — חותמת "להשלמה" (עמ\' 22)',
-        specRef: 'עמ\' 22',
+        specRef: "מצגת שפת רחוב ושצ\"פ, עמ' 22",
       },
     ],
   },
@@ -213,7 +301,7 @@ export const PLAN_TOPICS: PlanTopic[] = [
           { color: '#7AB8E8', label: 'אזור חדירת מים' },
         ],
         status: 'complete',
-        specRef: 'עמ\' 19',
+        specRef: "מצגת שפת רחוב ושצ\"פ, עמ' 23",
       },
     ],
   },

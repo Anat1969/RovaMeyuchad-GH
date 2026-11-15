@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CameraView, ContextMode, ItemStatus, PlanTopic, SpecItem } from '../types/plan';
-import { PLAN_TOPICS } from '../data/planData';
+import { PLAN_TOPICS, withAlternative } from '../data/planData';
 
 export interface LegendFocus {
   itemId: string;
@@ -25,6 +25,7 @@ interface PlanState {
   toggleEditMode: (on?: boolean) => void;
   updateItem: (topicId: string, itemId: string, patch: Partial<SpecItem>) => void;
   addItem: (topicId: string, item: SpecItem) => void;
+  selectAlternative: (topicId: string, itemId: string, alternativeId: string) => void;
   addTopic: (nameHe: string) => void;
   resetData: () => void;
   setLegendFocus: (f: LegendFocus | null) => void;
@@ -90,6 +91,18 @@ export const usePlanStore = create<PlanState>()(
           }),
         })),
 
+      // בחירת חלופה מחליפה את התמונה ואת המקרא, ולכן גם את צבעי המודל
+      selectAlternative: (topicId, itemId, alternativeId) =>
+        set((s) => ({
+          savedAt: Date.now(),
+          legendFocus: null,
+          topics: s.topics.map((t) =>
+            t.id !== topicId
+              ? t
+              : { ...t, items: t.items.map((i) => (i.id === itemId ? withAlternative(i, alternativeId) : i)) },
+          ),
+        })),
+
       addItem: (topicId, item) =>
         set((s) => ({
           savedAt: Date.now(),
@@ -149,7 +162,7 @@ export const usePlanStore = create<PlanState>()(
       setContextMode: (m) => set({ contextMode: m }),
     }),
     {
-      name: 'rova3d-plan-v3',
+      name: 'rova3d-plan-v4',
       partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode }),
     },
   ),

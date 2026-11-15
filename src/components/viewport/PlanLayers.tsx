@@ -8,7 +8,7 @@ import { resolveStyle, type PieceRef } from './layerStyle';
 /**
  * שכבות הפיתוח על רחובות התוכנית עצמה.
  * הרחובות אמיתיים (קטעים שלצד המגרשים). המיקום של כל רכיב לאורכם סכמטי:
- * מדרכה, רצועת ביוסוואל, עץ כל 6 מ', עמוד תאורה כל 30 מ', ספסל כל 60 מ'.
+ * רצועות הליכה, שירות וחנייה, רצועת ביוסוואל, עץ כל 6 מ', עמוד תאורה כל 30 מ', ספסל כל 60 מ'.
  */
 
 type Shape = 'box' | 'sphere' | 'cone' | 'cyl';
@@ -49,14 +49,13 @@ function build() {
 
   CONTEXT.planRuns.forEach((run, ri) => {
     const half = run.w / 2;
-    const paving = run.main ? 'paving-main' : 'paving-secondary';
     const ang = headings(run.pts);
     for (const side of [1, -1]) {
       const at = (d: number) => offsetLine(run.pts, side * (half + d));
-      // ריצוף: מדרכה, מסגרת, ובציר ראשי גם פס מוליך
-      strip({ layer: 'paving', item: paving, idx: 0 }, at(3.6), 3.4, 0.16);
-      strip({ layer: 'paving', item: paving, idx: 1 }, at(5.5), 0.5, 0.2);
-      if (run.main) strip({ layer: 'paving', item: paving, idx: 2 }, at(3.6), 0.4, 0.24);
+      // ריצוף, לפי אזורי החלופה שנבחרה: רצועת הליכה, רצועת שירות, ורצועת חנייה בשולי הכביש
+      strip({ layer: 'paving', item: 'paving-main', idx: 0 }, at(4.4), 3.2, 0.16);
+      strip({ layer: 'paving', item: 'paving-main', idx: 1 }, at(2.3), 1, 0.18);
+      strip({ layer: 'paving', item: 'paving-main', idx: 2 }, at(-1.1), 2.2, 0.12);
       // ניקוז: רצועת ביוסוואל, ואזור חדירה כל 36 מ'
       const swale = at(1.1);
       strip({ layer: 'water', item: 'bioswale', idx: 0 }, swale, 1.4, 0.1);
@@ -64,7 +63,7 @@ function build() {
         strip({ layer: 'water', item: 'bioswale', idx: 1 }, [swale[i], swale[i + 1]], 1.1, 0.14);
       }
       const lamps = at(2.2);
-      const seats = at(4.2);
+      const seats = at(5.4);
       swale.forEach((p, i) => {
         const shift = side > 0 ? 0 : 1;
         // פתח נטיעה מלבני, 1.2 על 2.4 מ' (המינימום בהוראות התכנית), ועץ בכל 6 מ'

@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { sortedTopics, usePlanStore } from '../../store/planStore';
 import Badge from '../ui/Badge';
+import type { PlanTopic } from '../../types/plan';
+
+/** החלופה שנבחרה בנושא, אם יש בו חלופות */
+function chosen(t: PlanTopic) {
+  const item = t.items.find((i) => i.alternatives?.length);
+  return item?.alternatives?.find((a) => a.id === item.selectedAlternativeId)?.label;
+}
 
 export default function TopicSidebar() {
   const topics = usePlanStore((s) => s.topics);
@@ -29,6 +36,7 @@ export default function TopicSidebar() {
           >
             <span className="h-3 w-3 shrink-0" style={{ background: t.layerColor ?? '#77736C' }} />
             <span className="whitespace-nowrap">{t.nameHe}</span>
+            {on && chosen(t) && <span className="whitespace-nowrap text-xs font-normal text-ink/55">{chosen(t)}</span>}
             <Badge status={t.status} />
           </button>
         );

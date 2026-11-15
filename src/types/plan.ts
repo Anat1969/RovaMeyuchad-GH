@@ -9,6 +9,28 @@ export interface LegendEntry {
   credit?: string; // צלם ורישיון
 }
 
+/** אזור צבע במודל: רצועה בחתך הרחוב שהחלופה צובעת */
+export interface ColorZone {
+  zoneId: string; // 'walk' | 'service' | 'parking' | 'path'
+  color: string; // hex, נדגם מהמצגת
+  label: string;
+}
+
+/** חלופת תכנון שהציג צוות התכנון, לבחירת אדריכלית העיר */
+export interface PlanAlternative {
+  id: string;
+  label: string; // "חלופה 1"
+  title: string; // שם החלופה במצגת
+  image: string; // השקף מהמצגת
+  description: string;
+  colorZones: ColorZone[];
+  cost?: string;
+  costLevel?: 1 | 2 | 3; // דרגת העלות במצגת, מתוך 3
+  streets?: string; // לאילו רחובות החלופה מיועדת
+  recommended?: boolean; // המלצת האדריכל, רק אם סומנה במצגת
+  note?: string;
+}
+
 export interface SpecItem {
   id: string;
   nameHe: string;
@@ -19,6 +41,8 @@ export interface SpecItem {
   status: ItemStatus;
   note?: string; // הערה / "להשלמה"
   specRef?: string; // מקור: "עמ' 21"
+  alternatives?: PlanAlternative[];
+  selectedAlternativeId?: string;
 }
 
 /** דרישה שכבר קבועה בהוראות התכנית המאושרת */

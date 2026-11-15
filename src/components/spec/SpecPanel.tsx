@@ -7,6 +7,7 @@ import SpecPending from './SpecPending';
 import SpecEditForm from './SpecEditForm';
 import SpecStatutory from './SpecStatutory';
 import QuarterPanel from './QuarterPanel';
+import SpecAlternatives from './SpecAlternatives';
 
 export default function SpecPanel() {
   const { topic, item } = useSelection();
@@ -73,6 +74,13 @@ export default function SpecPanel() {
           >
             {topic.id === 'massing' ? (
               <QuarterPanel topic={topic} item={item} />
+            ) : item.alternatives?.length ? (
+              <>
+                <SpecAlternatives item={item} topic={topic} />
+                <SpecLegend item={item} />
+                {item.note && <p className="mt-4 bg-ink/[0.04] p-3 text-xs text-ink/70">{item.note}</p>}
+                <SpecStatutory topic={topic} />
+              </>
             ) : isEditMode ? (
               <SpecEditForm key={item.id} topic={topic} item={item} />
             ) : item.status === 'pending' ? (
