@@ -14,7 +14,7 @@ export default function AppendixPanel() {
   return (
     <PanelShell
       name='נספחי התב"ע'
-      title={`${APPENDICES.length} נספחים, ${withSheet} מהם נפרשים על המודל`}
+      title={`${APPENDICES.length} מסמכים, ${withSheet} מהם נפרשים על המודל`}
       lead="לכל נספח: מה הוא קובע, על מה לשים לב בתכנון, והמסמך המקורי. תשריט נפרש על הקרקע במקומו, והמודל התלת-ממדי נשאר מעליו."
     >
       <ol className="mt-4 space-y-2">
@@ -40,7 +40,7 @@ export default function AppendixPanel() {
                     </button>
                   )}
                   {a.sheet && on && <IconBtn icon="top" label="מבט על" onClick={() => setView('top')} />}
-                  {a.go && <IconBtn icon="show" label="הצגת המגרשים במודל" onClick={() => go(a.go!)} />}
+                  {a.go && <IconBtn icon="show" label="הצגת הנושא במודל" onClick={() => go(a.go!)} />}
                   {a.docs.map((d) => (
                     <a key={d.url} href={d.url} target="_blank" rel="noreferrer" title="פתיחת המסמך" className="btn px-2 py-1.5 text-xs underline decoration-ink/30 underline-offset-4">
                       {d.name}
@@ -68,8 +68,7 @@ export default function AppendixPanel() {
         })}
       </ol>
       <p className="mt-5 text-xs leading-relaxed text-ink/50">
-        הנתונים נקראו בעין מגיליונות סרוקים, ולכן כדאי לאמת מספרים מול המסמך המקורי לפני שימוש רשמי. נספחים שעוד לא הועלו: נספח בינוי, נספח נופי, נספח עצים בוגרים
-        ונספח ניקוז.
+        הנתונים נקראו בעין מגיליונות סרוקים, ולכן כדאי לאמת מספרים מול המסמך המקורי לפני שימוש רשמי. עוד לא הועלה: נספח עצים בוגרים.
       </p>
     </PanelShell>
   );
