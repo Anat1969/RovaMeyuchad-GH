@@ -66,3 +66,14 @@ export interface QuarterData {
   buildingLines: Ring[];
   commercialFronts: Ring[];
 }
+
+/** הקונטקסט העירוני: רחובות ורובעים מהאפליקציה RechovNumbers, ואריחי תצלום אוויר */
+export interface ContextData {
+  streets: { n: string; q: string | null; w: number; l: Ring[] }[];
+  quarters: { id: string; name: string; c: [number, number] }[];
+  /** קטעי הרחובות שלצד מגרשי התכנית, בדגימה כל 6 מ' */
+  planRuns: { n: string; main: boolean; w: number; pts: Ring }[];
+  tiles: { z: number; x: number; y: number; c: Ring }[];
+}
+
+export type ContextMode = 'schematic' | 'satellite' | 'none';

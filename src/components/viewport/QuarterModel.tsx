@@ -100,6 +100,9 @@ function Lot({ lot }: { lot: QuarterLot }) {
   const selectedLot = usePlanStore((s) => s.selectedLot);
   const focus = usePlanStore((s) => s.legendFocus);
   const selectLot = usePlanStore((s) => s.selectLot);
+  const topicId = usePlanStore((s) => s.selectedTopicId);
+  // בנושא פיתוח המסות נסוגות לרקע, כדי שהרחוב ייראה
+  const back = topicId !== null && topicId !== 'massing';
 
   // הצבעים נלקחים מהמקרא של נושא הבינוי, כמו בכל שאר המודל
   const legend = topics.find((t) => t.id === 'massing')?.items[0]?.legend ?? [];
@@ -113,6 +116,7 @@ function Lot({ lot }: { lot: QuarterLot }) {
 
   const isSel = selectedLot === lot.num;
   const fade = (idx: number) => {
+    if (back) return 0.16;
     if (selectedLot) return isSel ? 1 : 0.22;
     if (focus) return focus.idx === idx ? 1 : 0.12;
     return 1;
@@ -136,7 +140,7 @@ function Lot({ lot }: { lot: QuarterLot }) {
       <Html position={[c[0], lot.height + 6, -c[1]]} center zIndexRange={[5, 0]} style={{ pointerEvents: 'none' }}>
         <span
           className={`whitespace-nowrap px-1 text-[0.7rem] ${
-            isSel ? 'bg-ink font-semibold text-white' : selectedLot ? 'text-ink/30' : 'bg-white/70 text-ink/80'
+            isSel ? 'bg-ink font-semibold text-white' : selectedLot || back ? 'text-ink/30' : 'bg-white/70 text-ink/80'
           }`}
         >
           {lot.num}
@@ -150,10 +154,6 @@ function Lot({ lot }: { lot: QuarterLot }) {
 export default function QuarterModel() {
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.2, 0]}>
-        <planeGeometry args={[1700, 900]} />
-        <meshStandardMaterial color="#EFE9E1" roughness={1} />
-      </mesh>
       {QUARTER.lots.map((lot) => (
         <Lot key={lot.num} lot={lot} />
       ))}

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { CameraView, ItemStatus, PlanTopic, SpecItem } from '../types/plan';
+import type { CameraView, ContextMode, ItemStatus, PlanTopic, SpecItem } from '../types/plan';
 import { PLAN_TOPICS } from '../data/planData';
 
 export interface LegendFocus {
@@ -15,7 +15,9 @@ interface PlanState {
   isEditMode: boolean;
   legendFocus: LegendFocus | null;
   selectedLot: string | null;
-  view: { name: CameraView; tick: number };
+  view: { name: CameraView | 'detail'; tick: number };
+  zoom: { dir: 1 | -1; tick: number };
+  contextMode: ContextMode;
   savedAt: number;
 
   selectTopic: (id: string | null, itemId?: string) => void;
@@ -28,6 +30,8 @@ interface PlanState {
   setLegendFocus: (f: LegendFocus | null) => void;
   selectLot: (num: string | null) => void;
   setView: (name: CameraView) => void;
+  zoomBy: (dir: 1 | -1) => void;
+  setContextMode: (m: ContextMode) => void;
 }
 
 const clone = (t: PlanTopic[]): PlanTopic[] => JSON.parse(JSON.stringify(t));
@@ -49,6 +53,8 @@ export const usePlanStore = create<PlanState>()(
       legendFocus: null,
       selectedLot: null,
       view: { name: 'perspective', tick: 0 },
+      zoom: { dir: 1, tick: 0 },
+      contextMode: 'schematic',
       savedAt: 0,
 
       selectTopic: (id, itemId) =>
@@ -59,6 +65,13 @@ export const usePlanStore = create<PlanState>()(
             selectedItemId: topic ? (itemId ?? topic.items[0]?.id ?? null) : null,
             legendFocus: null,
             selectedLot: topic?.id === 'massing' ? s.selectedLot : null,
+            // נושא פיתוח נפתח במבט קרוב על רחובות התוכנית. חזרה למבט הכולל מרחיקה שוב
+            view:
+              topic && topic.id !== 'massing' && s.selectedTopicId !== topic.id && s.view.name !== 'detail'
+                ? { name: 'detail' as const, tick: s.view.tick + 1 }
+                : !topic && s.view.name === 'detail'
+                  ? { name: 'perspective' as const, tick: s.view.tick + 1 }
+                  : s.view,
           };
         }),
       selectItem: (id) => set({ selectedItemId: id, legendFocus: null }),
@@ -132,10 +145,12 @@ export const usePlanStore = create<PlanState>()(
             : { selectedLot: null, selectedTopicId: s.selectedTopicId },
         ),
       setView: (name) => set((s) => ({ view: { name, tick: s.view.tick + 1 } })),
+      zoomBy: (dir) => set((s) => ({ zoom: { dir, tick: s.zoom.tick + 1 } })),
+      setContextMode: (m) => set({ contextMode: m }),
     }),
     {
       name: 'rova3d-plan-v3',
-      partialize: (s) => ({ topics: s.topics }),
+      partialize: (s) => ({ topics: s.topics, contextMode: s.contextMode }),
     },
   ),
 );
@@ -154,8 +169,3 @@ export function useSelection() {
 export function completionStats(topics: PlanTopic[]) {
   return { total: topics.length, complete: topics.filter((t) => t.status === 'complete').length };
 }
-
-/** איזה מודל מוצג: הרובע כולו (מקובצי התכנית), או חתך רחוב טיפוסי לנושאי הפיתוח */
-export type SceneName = 'quarter' | 'street';
-export const sceneFor = (topicId: string | null): SceneName =>
-  !topicId || topicId === 'massing' ? 'quarter' : 'street';
