@@ -15,6 +15,8 @@ import {
   type Analysis,
   type Season,
   designShift,
+  yardShade,
+  YARD_HOURS,
   effWind,
   windName,
   setSurface,
@@ -119,6 +121,55 @@ function useFindings(a: Analysis, season: Season, windFrom: number, design: bool
       ] as Tip[],
     };
   }, [a, season, windFrom, design]);
+}
+
+/** הצללת חצרות המגרשים, מול הדרישה שבהנחיות המרחביות: 20% מכלל שטח הפיתוח, בשלוש שעות ביוני */
+function Yards() {
+  const selectLot = usePlanStore((s) => s.selectLot);
+  const rows = useMemo(() => [...yardShade()].sort((x, y) => x.min - y.min), []);
+  const fail = rows.filter((r) => r.min < 0.2);
+  return (
+    <section className="mt-5 border-r-2 border-ink bg-white p-3">
+      <h3 className="text-lg font-semibold">חצרות המגרשים: {fail.length} מתוך {rows.length} מתחת ל-20% צל</h3>
+      <p className="mt-1 text-xs text-ink/55">מקור הדרישה: הנחיות מרחביות אשדוד, מהדורה 18, סעיף 2.2.2. נמדד ב-21 ביוני, בשעות 10:00, 12:00 ו-15:00.</p>
+      <p className="mt-2 text-sm leading-relaxed">
+        <span className="font-semibold">הנחיה לאדריכל: </span>
+        <span className="bg-[#F4E9A8] px-1">במגרשים שברשימה נדרשים עצי צל או מצללות בתוך החצר, בעיקר לשעת הצהריים.</span>
+      </p>
+      <table className="mt-2 w-full text-xs">
+        <thead>
+          <tr className="border-b border-ink/20 text-right text-ink/60">
+            <th className="py-1 font-normal">מגרש</th>
+            {YARD_HOURS.map((h) => (
+              <th key={h} className="font-normal">
+                {h}:00
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {fail.map((r) => (
+            <tr key={r.num} className="border-b border-ink/10">
+              <td className="py-1">
+                <button title="הצגת המגרש במודל" className="font-semibold underline decoration-ink/30 underline-offset-4" onClick={() => selectLot(r.num)}>
+                  {r.num}
+                </button>
+              </td>
+              {r.pct.map((v, i) => (
+                <td key={i} className={v < 0.2 ? 'font-semibold text-wait' : ''}>
+                  {Math.round(v * 100)}%
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-xs leading-relaxed text-ink/50">
+        החצר היא שטח המגרש בלי טביעת מעטפת הזכויות. הצל הוא של הבניינים ושל עצי הרחוב בלבד: עצים ומצללות בתוך המגרש עוד לא תוכננו, ולכן התוצאה היא נקודת המוצא ולא המצב הסופי. הדרישות ל-100% צל
+        על ספסלים ול-40% בשטחי השהייה ייבדקו כשיהיה תכנון של החצר.
+      </p>
+    </section>
+  );
 }
 
 export default function AnalysisPanel({ a }: { a: Analysis }) {
@@ -272,6 +323,8 @@ export default function AnalysisPanel({ a }: { a: Analysis }) {
           ))}
         </ol>
       </section>
+
+      {a === 'shade' && <Yards />}
 
       <section className="mt-5">
         <h3 className="text-sm font-semibold">{f.bars.label}</h3>

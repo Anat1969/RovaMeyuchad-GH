@@ -180,6 +180,55 @@ export function shadeFraction(season: Season, from = 8, to = 16): Float32Array {
   return out;
 }
 
+/** השעות שבהן ההנחיות המרחביות דורשות להציג הצללה, ביוני (סעיף 2.2.2) */
+export const YARD_HOURS = [10, 12, 15];
+export interface YardShade {
+  num: string;
+  pct: number[]; // שיעור הצל בחצר, בכל אחת משלוש השעות
+  min: number;
+}
+let yardCache: YardShade[] | null = null;
+/**
+ * הצללת מרחב הפיתוח של כל מגרש מגורים: שטח המגרש בלי טביעת הבניין, ב-21 ביוני בשלוש השעות.
+ * הצל הוא של מעטפות הזכויות ושל עצי הרחוב בלבד. עצים ומצללות בתוך המגרש עוד לא תוכננו, ולכן אינם נספרים.
+ */
+export function yardShade(): YardShade[] {
+  if (yardCache) return yardCache;
+  const lots = QUARTER.lots;
+  // מפת מגרשים: לכל פיקסל, מספר המגרש שהוא בתוכו
+  const c = canvas();
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
+  lots.forEach((l, i) => {
+    ctx.fillStyle = `rgb(${i + 1},0,0)`;
+    poly(ctx, l.ring as Pt[]);
+    ctx.fill();
+  });
+  const id = ctx.getImageData(0, 0, PW, PH).data;
+  const built = buildingMask();
+  const open = new Float64Array(lots.length);
+  const shaded = YARD_HOURS.map(() => new Float64Array(lots.length));
+  const masks = YARD_HOURS.map((h) => {
+    ctx.clearRect(0, 0, PW, PH);
+    drawShade(ctx, 'summer', h, '#000');
+    return ctx.getImageData(0, 0, PW, PH).data;
+  });
+  for (let i = 0; i < PW * PH; i++) {
+    // רק פיקסל שכולו בתוך מגרש (בלי שולי החלקה), ושאינו בניין
+    if (id[i * 4 + 3] < 250 || built[i]) continue;
+    const k = id[i * 4] - 1;
+    if (k < 0 || k >= lots.length) continue;
+    open[k]++;
+    masks.forEach((m, h) => {
+      if (m[i * 4 + 3] > 127) shaded[h][k]++;
+    });
+  }
+  yardCache = lots.map((l, k) => {
+    const pct = shaded.map((s) => (open[k] ? s[k] / open[k] : 0));
+    return { num: l.num, pct, min: Math.min(...pct) };
+  });
+  return yardCache;
+}
+
 // ---------- מפות צבע
 type Ramp = [number, number, number][];
 export const RAMPS: Record<Analysis, { ramp: Ramp; low: string; high: string }> = {
