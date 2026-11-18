@@ -2,14 +2,14 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CONTEXT } from '../../data/contextData';
-import { ROUND, ROUNDABOUTS } from '../../data/junctions';
+import { PLANNED_ROADS, ROUND, ROUNDABOUTS } from '../../data/junctions';
 import { usePlanStore } from '../../store/planStore';
 import { headings, offsetLine, ribbonGeometry, type Pt } from './geometry';
 import { pushRibbonT as pushRibbon, tY } from '../../analysis/terrain';
 import { EXISTING_TREES } from '../../data/existingTrees';
 import { RULES } from '../../data/rules';
 import { QUARTER } from '../../data/quarterData';
-import { drapedShape } from '../../analysis/terrain';
+import { densify, drapedShape } from '../../analysis/terrain';
 import { PAVE_OF, paveTexture } from './paveTex';
 import { resolveStyle, type PieceRef } from './layerStyle';
 
@@ -144,6 +144,10 @@ function pushDisc(out: number[], c: Pt, r0: number, r1: number, y: number) {
   }
 }
 
+/** רוחב המדרכה מכל צד של הכביש, וגובה כל שכבה מעל הקרקע. הפרש הגובה שומר על סדר השכבות גם ממרחק */
+const WALK = 6;
+const LIFT = { walk: 0.3, road: 0.38 };
+
 function build() {
   const inst = new Map<string, InstGroup>();
   const ribbons = new Map<string, RibbonGroup>();
@@ -183,11 +187,12 @@ function build() {
   const PAVE: PieceRef = { layer: 'paving', item: 'paving-main', idx: 0 };
   const ASPHALT: PieceRef = { layer: 'road', item: 'road', fixed: '#5B5C5F' };
   for (const j of junctions) {
-    pushDisc(band(PAVE, 'j', false, true), j.c, 0, j.r, 0.05);
-    pushDisc(band(ASPHALT), j.c, 0, j.road, 0.09);
+    if (!j.round) continue;
+    pushDisc(band(PAVE, 'j', false, true), j.c, 0, j.r, LIFT.walk);
+    pushDisc(band(ASPHALT), j.c, 0, j.road, LIFT.road);
     if (j.round) {
-      pushDisc(band({ layer: 'paving', item: 'paving-main', idx: 1 }), j.c, ROUND.island, ROUND.apron, 0.2);
-      pushDisc(band({ layer: 'planting', item: 'groundcover', idx: 0 }), j.c, 0, ROUND.island, 0.26);
+      pushDisc(band({ layer: 'paving', item: 'paving-main', idx: 1 }), j.c, ROUND.island, ROUND.apron, LIFT.road + 0.1);
+      pushDisc(band({ layer: 'planting', item: 'groundcover', idx: 0 }), j.c, 0, ROUND.island, LIFT.road + 0.16);
       const tree: PieceRef = { layer: 'planting', item: 'trees-main', idx: 0 };
       put({ ...tree, idx: undefined, fixed: '#7A6652' }, 'cyl', j.c, 1.6, [0.22, 3.2, 0.22]);
       put(tree, 'sphere', j.c, 5, [3, 2.4, 3]);
@@ -219,28 +224,70 @@ function build() {
     return hits >= Math.max(2, pts.length / 6) ? Math.min(14, sum / hits + 2) : null;
   };
 
+  // רשת הדרכים שסביב התוכנית: כל רחוב שעובר בתחום הרובע או לידו מקבל כביש ומדרכה רציפים,
+  // גם אם אין לאורכו מגרשי מגורים. כך כביש 8 מחבר את שני הגושים, והדרכים ההיקפיות נסגרות
+  const xs = QUARTER.lots.flatMap((l) => l.ring.map((q) => q[0]));
+  const ys = QUARTER.lots.flatMap((l) => l.ring.map((q) => q[1]));
+  const box = [Math.min(...xs) - 220, Math.max(...xs) + 220, Math.min(...ys) - 220, Math.max(...ys) + 220];
+  const near = (q: Pt) => q[0] > box[0] && q[0] < box[1] && q[1] > box[2] && q[1] < box[3];
+  for (const st of CONTEXT.streets) {
+    for (const raw of st.l) {
+      const pts = densify(raw as Pt[], 8);
+      // רק החלק של הרחוב שבתחום: נחתך לקטעים רציפים
+      let part: Pt[] = [];
+      const flush = () => {
+        if (part.length > 1) {
+          pushRibbon(band(PAVE, 'j', false, true), part, st.w + WALK * 2, LIFT.walk);
+          pushRibbon(band(ASPHALT), part, st.w, LIFT.road);
+          for (const e of [part[0], part[part.length - 1]]) {
+            pushDisc(band(PAVE, 'j', false, true), e, 0, st.w / 2 + WALK, LIFT.walk);
+            pushDisc(band(ASPHALT), e, 0, st.w / 2, LIFT.road);
+          }
+        }
+        part = [];
+      };
+      for (const q of pts) {
+        if (near(q)) part.push(q);
+        else flush();
+      }
+      flush();
+    }
+  }
+
+  for (const r of PLANNED_ROADS) {
+    const pts = densify(r.pts, 8);
+    pushRibbon(band(PAVE, 'j', false, true), pts, r.w + WALK * 2, LIFT.walk);
+    pushRibbon(band(ASPHALT), pts, r.w, LIFT.road);
+  }
+
   CONTEXT.planRuns.forEach((run, ri) => {
     const half = run.w / 2;
     const line = run.pts as Pt[];
-    strip({ layer: 'road', item: 'road', fixed: '#5B5C5F' }, line, run.w, 0.08, true);
+    // שיטת המפות: מדרכה רחבה ורציפה מתחת, והכביש מעליה. שתיהן עוברות דרך הצמתים בלי להיקטע,
+    // ובקצה כל קטע עיגול ברוחב הרצועה. כך המדרכות והכבישים מתחברים בכל פינה, בלי רווחים
+    pushRibbon(band(PAVE, 'j', false, true), line, run.w + WALK * 2, LIFT.walk);
+    pushRibbon(band(ASPHALT), line, run.w, LIFT.road);
+    for (const e of [line[0], line[line.length - 1]]) {
+      pushDisc(band(PAVE, 'j', false, true), e, 0, half + WALK, LIFT.walk);
+      pushDisc(band(ASPHALT), e, 0, half, LIFT.road);
+    }
     const ang = headings(line);
     for (const side of [1, -1]) {
       const at = (d: number) => offsetLine(line, side * (half + d));
       // שדרה עם שני מסלולים: בצד הפנימי אין מדרכה, אלא אי תנועה מגונן שממלא את הרווח
       const gap = twinGap(ri, side);
       if (gap !== null) {
-        strip({ layer: 'planting', item: 'groundcover', idx: 0 }, at(gap / 4), gap / 2 + 0.4, 0.14);
+        strip({ layer: 'planting', item: 'groundcover', idx: 0 }, at(gap / 4), gap / 2 + 0.4, LIFT.road + 0.06);
         continue;
       }
       // ריצוף, לפי אזורי החלופה שנבחרה: רצועת הליכה, רצועת שירות, ורצועת חנייה בשולי הכביש
-      strip({ layer: 'paving', item: 'paving-main', idx: 0 }, at(4.4), 3.2, 0.16);
-      strip({ layer: 'paving', item: 'paving-main', idx: 1 }, at(2.3), 1, 0.18);
-      strip({ layer: 'paving', item: 'paving-main', idx: 2 }, at(-1.1), 2.2, 0.12);
+      strip({ layer: 'paving', item: 'paving-main', idx: 1 }, at(2.3), 1, LIFT.walk + 0.08);
+      strip({ layer: 'paving', item: 'paving-main', idx: 2 }, at(-1.1), 2.2, LIFT.road + 0.04);
       // ניקוז: רצועת ביוסוואל, ואזור חדירה כל 36 מ'
       const swale = at(1.1);
-      strip({ layer: 'water', item: 'bioswale', idx: 0 }, swale, 1.4, 0.1);
+      strip({ layer: 'water', item: 'bioswale', idx: 0 }, swale, 1.4, LIFT.walk + 0.05);
       for (let i = 2; i + 1 < swale.length; i += 6) {
-        strip({ layer: 'water', item: 'bioswale', idx: 1 }, [swale[i], swale[i + 1]], 1.1, 0.14);
+        strip({ layer: 'water', item: 'bioswale', idx: 1 }, [swale[i], swale[i + 1]], 1.1, LIFT.walk + 0.09);
       }
       const lamps = at(2.2);
       const seats = at(5.4);
