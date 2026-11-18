@@ -82,14 +82,44 @@ for ln in (list(line.geoms) if hasattr(line,'geoms') else [line]):
         if pc.contains(Point(a.x+nx*2,a.y+ny*2)): nx,ny=-nx,-ny
         if not pz.contains(a) or not pr.contains(a): continue
         pts.append([round(a.x,1),round(a.y,1),round(nx,2),round(ny,2)])
-d={'row':dump(row,0.6,350),'road':dump(car,0.6,40),'strip':dump(strip,0.5,30),'swale':dump(swale,0.5,30),'curb':pts}
-print({k:len(v) for k,v in d.items()}, sum(len(a['o'])+sum(len(h) for h in a['h']) for k in ('row','road','strip','swale') for a in d[k]))
+# אי תנועה מגונן: פס צר במרכז המיסעה, בכל כביש שרוחבו 17 מ' ומעלה.
+# בכל עומק כרסום נשאר פס במרכז. לוקחים רק את החלקים הצרים שלו (עד 4.4 מ'), וכך מתקבל פס אחיד בכל רוחב כביש
+thin=[]
+for h in (8.5,10.5,12.5,14.5,16.5,18.5,20.5,22.5):
+    e=car.buffer(-h,join_style=1)
+    if e.is_empty: continue
+    thin.append(e.difference(e.buffer(-2.2,join_style=1).buffer(2.4,join_style=1)))
+median=unary_union(thin).buffer(0.9,join_style=1).buffer(-0.3,join_style=1).intersection(zone)
+# צמתים: בכמה קני מידה, מה שנשאר מהמיסעה אחרי כרסום והוא קומפקטי הוא לב של צומת
+junc=[]
+for r in (4.6,6.5,9,12.5,16,20):
+    e=car.buffer(-r,join_style=1)
+    for g in (list(e.geoms) if hasattr(e,'geoms') else [e]):
+        if g.is_empty: continue
+        x0,y0,x1,y1=g.bounds
+        if max(x1-x0,y1-y0)<3.2*r+6 and g.area>3:
+            c=g.centroid
+            if zone.contains(c) and all(math.hypot(c.x-j[0],c.y-j[1])>18 for j in junc): junc.append((c.x,c.y,r))
+print('junctions',len(junc))
+# מעבר חצייה: טבעת סביב לב הצומת, חתוכה במיסעה. כך יש מעבר בכל זרוע שנכנסת לצומת
+cross=unary_union([Point(x,y).buffer(r*1.9+5.4).difference(Point(x,y).buffer(r*1.9+2.2)) for x,y,r in junc]).intersection(car) if junc else Polygon()
+median=median.difference(unary_union([Point(x,y).buffer(r*1.9+7) for x,y,r in junc])) if junc else median
+def dumpS(g, tol, amin):
+    gs=list(g.geoms) if hasattr(g,'geoms') else [g]
+    o=[]
+    for a_ in gs:
+        if a_.geom_type!='Polygon' or a_.area<amin: continue
+        a_=a_.simplify(tol)
+        o.append({'o':[[round(x,1),round(y,1)] for x,y in list(a_.exterior.coords)[:-1]], 'h':[]})
+    return o
+d={'row':dump(row,0.6,350),'road':dump(car,0.6,40),'strip':dump(strip,0.5,30),'swale':dump(swale,0.5,30),'median':dumpS(median,0.5,60),'cross':dumpS(cross,0.3,8),'curb':pts}
+print({k:len(v) for k,v in d.items()})
 HEAD = """// נוצר אוטומטית מתשריט המצב המאושר של תכנית 603-0811588 (נספח רקע, וקטורי). לא לערוך ידנית.
 // row: זכות הדרך (דרך מאושרת ודרך מוצעת), כפי שהיא צבועה בתשריט. road: המיסעה, זכות הדרך פחות כ-4 מ' מכל צד (הנחה).
-// strip, swale: רצועות שירות וביוסוואל סביב המיסעה. curb: נקודה כל 6 מ' לאורך אבן השפה, עם הכיוון אל המדרכה.
+// strip, swale: רצועות שירות וביוסוואל סביב המיסעה. median: אי תנועה מגונן בכבישים הרחבים. cross: מעברי חצייה בכניסה לכל צומת (סכמטי). curb: נקודה כל 6 מ' לאורך אבן השפה, עם הכיוון אל המדרכה.
 // כביש 8 בין שני גושי המגורים מכוסה בתשריט בקווקוו, ולכן הושלם סכמטית.
 export interface Area { o: [number, number][]; h: [number, number][][] }
-export const ROADS: { row: Area[]; road: Area[]; strip: Area[]; swale: Area[]; curb: [number, number, number, number][] } = """
+export const ROADS: { row: Area[]; road: Area[]; strip: Area[]; swale: Area[]; median: Area[]; cross: Area[]; curb: [number, number, number, number][] } = """
 open(out,'w',encoding='utf-8').write(HEAD+json.dumps(d,separators=(',',':'))+";\n")
 from PIL import Image, ImageDraw
 pm=Image.new('RGB',(1500,1300),'white'); dw=ImageDraw.Draw(pm)

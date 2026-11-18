@@ -34,6 +34,7 @@ interface RibbonGroup extends PieceRef {
   positions: number[];
   realOnly?: boolean; // מוצג רק בהדמיה הריאליסטית
   under?: boolean; // משטח שמונח מתחת לכביש: המדרכה
+  top?: boolean; // סימון על הכביש: מעבר חצייה
   geo?: THREE.BufferGeometry; // משטח מוכן, במקום רצועה לאורך קו
 }
 
@@ -83,6 +84,9 @@ function build() {
     surface({ layer: 'road', item: 'road', fixed: '#5B5C5F' }, ROADS.road, LIFT.road),
     surface({ layer: 'paving', item: 'paving-main', idx: 1 }, ROADS.strip, LIFT.strip),
     surface({ layer: 'water', item: 'bioswale', idx: 0 }, ROADS.swale, LIFT.swale),
+    // אי תנועה מגונן בכבישים הרחבים, ומעברי חצייה בכניסה לכל צומת
+    surface({ layer: 'planting', item: 'groundcover', idx: 0 }, ROADS.median, LIFT.road + 0.08),
+    { ...surface({ layer: 'road', item: 'road', fixed: '#E4E0D8' }, ROADS.cross, LIFT.road + 0.06), top: true },
   ];
 
   ROADS.curb.forEach(([x, y, nx, ny], i) => {
@@ -193,7 +197,7 @@ function Ribbon({ g }: { g: RibbonGroup }) {
   return (
     <mesh
       geometry={geo}
-      renderOrder={g.under ? 0 : g.layer === 'road' ? 1 : 2}
+      renderOrder={g.top ? 3 : g.under ? 0 : g.layer === 'road' ? 1 : 2}
       receiveShadow={real}
       onClick={(e) => {
         e.stopPropagation();
@@ -203,10 +207,10 @@ function Ribbon({ g }: { g: RibbonGroup }) {
       <meshStandardMaterial
         key={map ? 'tex' : 'flat'}
         polygonOffset
-        polygonOffsetFactor={g.under ? -1 : g.layer === 'road' ? -2 : -4}
-        polygonOffsetUnits={g.under ? -1 : g.layer === 'road' ? -2 : -4}
+        polygonOffsetFactor={g.top ? -6 : g.under ? -1 : g.layer === 'road' ? -2 : -4}
+        polygonOffsetUnits={g.top ? -6 : g.under ? -1 : g.layer === 'road' ? -2 : -4}
         map={map}
-        color={g.layer === 'road' && !real ? '#9A9A9C' : style.color}
+        color={g.top ? '#E4E0D8' : g.layer === 'road' && !real ? '#9A9A9C' : style.color}
         transparent
         opacity={style.opacity}
         wireframe={style.ghost}
