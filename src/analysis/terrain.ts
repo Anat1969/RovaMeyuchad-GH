@@ -119,8 +119,9 @@ export function groundGeometry(lift: number) {
 }
 
 /** מצולע שטוח (מגרש פתוח, שצ"פ), מחולק למשולשים קטנים ומונח על הקרקע */
-export function drapedShape(ring: Pt[], lift: number) {
+export function drapedShape(ring: Pt[], lift: number, holes: Pt[][] = []) {
   const shape = new THREE.Shape(ring.map(([x, y]) => new THREE.Vector2(x, y)));
+  for (const h of holes) shape.holes.push(new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y))));
   let g: THREE.BufferGeometry = new THREE.ShapeGeometry(shape);
   g.rotateX(-Math.PI / 2);
   g = new TessellateModifier(22, 7).modify(g);
