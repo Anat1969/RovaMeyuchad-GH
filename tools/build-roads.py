@@ -101,8 +101,32 @@ for r in (4.6,6.5,9,12.5,16,20):
             c=g.centroid
             if zone.contains(c) and all(math.hypot(c.x-j[0],c.y-j[1])>18 for j in junc): junc.append((c.x,c.y,r))
 print('junctions',len(junc))
-# מעבר חצייה: טבעת סביב לב הצומת, חתוכה במיסעה. כך יש מעבר בכל זרוע שנכנסת לצומת
-cross=unary_union([Point(x,y).buffer(r*1.9+5.4).difference(Point(x,y).buffer(r*1.9+2.2)) for x,y,r in junc]).intersection(car) if junc else Polygon()
+# מעבר חצייה: ישר, בניצב לכביש, בכל זרוע שנכנסת לצומת.
+# הטבעת סביב לב הצומת משמשת רק לאיתור הזרועות. בכל זרוע נבנה מלבן ישר, ובתוכו פסים לאורך כיוון הנסיעה
+from shapely.geometry import Polygon as _P
+stripes=[]
+for x,y,r in junc:
+    D=r*1.9+3.8
+    ring=Point(x,y).buffer(D+1.6).difference(Point(x,y).buffer(D-1.6)).intersection(car)
+    for arm in (list(ring.geoms) if hasattr(ring,'geoms') else [ring]):
+        if arm.is_empty or arm.area<6: continue
+        c=arm.centroid; ux,uy=c.x-x,c.y-y; L_=math.hypot(ux,uy) or 1; ux,uy=ux/L_,uy/L_; vx,vy=-uy,ux
+        cx_,cy_=x+ux*D,y+uy*D
+        # רוחב הזרוע: כמה רחוק המיסעה נמשכת לכל צד, בניצב לכיוון הנסיעה
+        half=0
+        for sgn in (1,-1):
+            t=0
+            while t<40 and car.contains(Point(cx_+vx*sgn*(t+0.5),cy_+vy*sgn*(t+0.5))): t+=0.5
+            half=max(half,t)
+        if half<2: continue
+        t=-half+0.4
+        while t<=half-0.9:
+            sq=[(cx_+vx*t+ux*a_,cy_+vy*t+uy*a_) for a_ in (-1.6,1.6)]+[(cx_+vx*(t+0.5)+ux*a_,cy_+vy*(t+0.5)+uy*a_) for a_ in (1.6,-1.6)]
+            st=_P(sq)
+            if car.contains(st): stripes.append(st)
+            t+=1.0
+cross=unary_union(stripes) if stripes else Polygon()
+print('stripes',len(stripes))
 median=median.difference(unary_union([Point(x,y).buffer(r*1.9+7) for x,y,r in junc])) if junc else median
 def dumpS(g, tol, amin):
     gs=list(g.geoms) if hasattr(g,'geoms') else [g]
@@ -112,11 +136,11 @@ def dumpS(g, tol, amin):
         a_=a_.simplify(tol)
         o.append({'o':[[round(x,1),round(y,1)] for x,y in list(a_.exterior.coords)[:-1]], 'h':[]})
     return o
-d={'row':dump(row,0.6,350),'road':dump(car,0.6,40),'strip':dump(strip,0.5,30),'swale':dump(swale,0.5,30),'median':dumpS(median,0.5,60),'cross':dumpS(cross,0.3,8),'curb':pts}
+d={'row':dump(row,0.6,350),'road':dump(car,0.6,40),'strip':dump(strip,0.5,30),'swale':dump(swale,0.5,30),'median':dumpS(median,0.5,60),'cross':dumpS(cross,0.01,0.5),'curb':pts}
 print({k:len(v) for k,v in d.items()})
 HEAD = """// נוצר אוטומטית מתשריט המצב המאושר של תכנית 603-0811588 (נספח רקע, וקטורי). לא לערוך ידנית.
 // row: זכות הדרך (דרך מאושרת ודרך מוצעת), כפי שהיא צבועה בתשריט. road: המיסעה, זכות הדרך פחות כ-4 מ' מכל צד (הנחה).
-// strip, swale: רצועות שירות וביוסוואל סביב המיסעה. median: אי תנועה מגונן בכבישים הרחבים. cross: מעברי חצייה בכניסה לכל צומת (סכמטי). curb: נקודה כל 6 מ' לאורך אבן השפה, עם הכיוון אל המדרכה.
+// strip, swale: רצועות שירות וביוסוואל סביב המיסעה. median: אי תנועה מגונן בכבישים הרחבים. cross: פסי מעברי החצייה, ישרים ובניצב לכביש, בכניסה לכל צומת (מיקום סכמטי). curb: נקודה כל 6 מ' לאורך אבן השפה, עם הכיוון אל המדרכה.
 // כביש 8 בין שני גושי המגורים מכוסה בתשריט בקווקוו, ולכן הושלם סכמטית.
 export interface Area { o: [number, number][]; h: [number, number][][] }
 export const ROADS: { row: Area[]; road: Area[]; strip: Area[]; swale: Area[]; median: Area[]; cross: Area[]; curb: [number, number, number, number][] } = """
