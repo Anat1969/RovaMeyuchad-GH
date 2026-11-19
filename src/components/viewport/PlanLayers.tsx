@@ -89,6 +89,13 @@ function build() {
     { ...surface({ layer: 'road', item: 'road', fixed: '#E4E0D8' }, ROADS.cross, LIFT.road + 0.06), top: true },
   ];
 
+  // עץ במרכז כל כיכר
+  for (const [x, y, r] of ROADS.rounds) {
+    const tree: PieceRef = { layer: 'planting', item: 'trees-main', idx: 0 };
+    put({ ...tree, idx: undefined, fixed: '#7A6652' }, 'cyl', [x, y], 1.9, [0.22, 3.2, 0.22]);
+    put(tree, 'sphere', [x, y], 5.2, [Math.min(3, r * 0.6), 2.4, Math.min(3, r * 0.6)]);
+  }
+
   ROADS.curb.forEach(([x, y, nx, ny], i) => {
     const p: Pt = [x, y];
     // עץ קיים לשימור גובר: לא נוטעים עץ חדש קרוב אליו מהמרחק שבאוגדן ההיתר
