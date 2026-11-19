@@ -57,6 +57,15 @@ from shapely.geometry import box
 row=row.intersection(box(min(lx)-330,min(ly)-330,max(lx)+330,max(ly)+330))
 # המיסעה: כ-4 מ' מדרכה מכל צד. ההחלקה עדינה, כדי שרחובות פנימיים צרים לא ייעלמו
 car=row.buffer(-5.2,join_style=1).buffer(2.4,join_style=1).buffer(-1.2,join_style=1)
+# חורים קטנים בזכות הדרך ובמיסעה הם סמלים וכיתובים שבתשריט (עץ, מספר, חץ), ולא איים אמיתיים. ממלאים אותם,
+# אחרת מתקבלים "איי מדרכה" עם עצים באמצע כביש או צומת. חור גדול הוא בלוק בנוי, והוא נשאר
+def fill(g, amin):
+    gs=list(g.geoms) if hasattr(g,'geoms') else [g]
+    return unary_union([Polygon(a.exterior,[h for h in a.interiors if Polygon(h).area>=amin]) for a in gs if a.geom_type=='Polygon'])
+row=fill(row,1500); car=fill(car,1500)
+# מגרש אינו דרך: גוון דומה בתשריט גרם לכך שבלוקים שלמים נצבעו כמדרכה
+_lots=unary_union([Polygon(l['ring']).buffer(0) for l in q['lots']])
+row=row.difference(_lots.buffer(-0.3)); car=car.difference(_lots.buffer(1.5))
 print('ROW',round(row.area),'carriage',round(car.area))
 def dump(g, tol, hmin):
     gs=list(g.geoms) if isinstance(g,MultiPolygon) else [g]
@@ -72,7 +81,7 @@ from shapely.geometry import Polygon as _P
 lotsU=unary_union([Polygon(l['ring']).buffer(0) for l in q['lots']])
 zone=lotsU.buffer(95)
 zoneJ=lotsU.buffer(170)
-ROUNDS=[(-265.4,93.7),(184.4,-105.5),(-492,-90)]  # שלוש הכיכרות שבנספח התנועה
+ROUNDS=[(-265.4,93.7),(184.4,-105.5)]  # שתי הכיכרות שעל כביש 8, לפי נספח התנועה. הסובה בקצה ניסים חדד אינה כיכר
 cb=car.boundary
 def rin(x,y): return cb.distance(Point(x,y)) if car.contains(Point(x,y)) else 0
 def recenter(x,y,span):
@@ -96,8 +105,11 @@ for r in (3.2,4.6,6.5,9,12.5,16,20,25,30):
         if max(x1-x0,y1-y0)<3.2*r+6 and g.area>3: cand.append((g.centroid.x,g.centroid.y))
 junc=[]  # x, y, רדיוס פנימי, כיכר
 for x,y in ROUNDS:
-    R,x,y=recenter(x,y,24)
-    if R>6: junc.append((x,y,R,True))
+    # כיכר רק במקום שהוא באמת צומת רחב: קרוב למיקום שבנספח, שלוש זרועות לפחות, ומקום לאי ולנתיב סביבו
+    x0_,y0_=x,y
+    R,x,y=recenter(x,y,12)
+    if R>=10 and math.hypot(x-x0_,y-y0_)<=14 and len(arms(x,y,R+7))>=3: junc.append((x,y,R,True))
+    else: print('roundabout skipped',x0_,y0_,round(R,1))
 for x,y in cand:
     R,x,y=recenter(x,y,8)
     if R<3 or not zoneJ.contains(Point(x,y)): continue
@@ -131,6 +143,12 @@ for x,y,R,rd in junc:
 cross=unary_union(stripes) if stripes else Polygon()
 clear=unary_union([Point(x,y).buffer(R+(11 if rd else 8)) for x,y,R,rd in junc])
 clearM=unary_union([Point(x,y).buffer(R*1.6+12) for x,y,R,rd in junc])
+def okMedian(g):
+    # אי תנועה הוא פס ארוך וצר. כל צורה אחרת היא שארית של החישוב, ונזרקת
+    if g.geom_type!='Polygon' or g.area<90: return False
+    c=list(g.minimum_rotated_rectangle.exterior.coords)
+    a_=math.hypot(c[1][0]-c[0][0],c[1][1]-c[0][1]); b_=math.hypot(c[2][0]-c[1][0],c[2][1]-c[1][1])
+    return min(a_,b_)<=7 and max(a_,b_)>=30 and g.area>=0.45*a_*b_
 # אי תנועה מגונן: פס במרכז כל כביש שרוחבו 17 מ' ומעלה, מוחלק, ונעצר לפני כל צומת
 thin=[]
 for h in (8.5,10.5,12.5,14.5,16.5,18.5,20.5,22.5,24.5,26.5):
@@ -138,7 +156,7 @@ for h in (8.5,10.5,12.5,14.5,16.5,18.5,20.5,22.5,24.5,26.5):
     if e.is_empty: continue
     thin.append(e.difference(e.buffer(-2.2,join_style=1).buffer(2.4,join_style=1)))
 median=unary_union(thin).buffer(2.2,join_style=1).buffer(-1.6,join_style=1).intersection(zone).difference(clearM)
-median=unary_union([g for g in (list(median.geoms) if hasattr(median,'geoms') else [median]) if g.area>=90 and g.minimum_rotated_rectangle.area<g.area*5]+refuges+islands)
+median=unary_union([g for g in (list(median.geoms) if hasattr(median,'geoms') else [median]) if okMedian(g)]+refuges+islands)
 # רצועות ועצים: נעצרים לפני הצמתים, כדי שהפינות ומעברי החצייה יישארו פנויים
 strip=car.buffer(2.3,join_style=1).difference(car.buffer(0.5,join_style=1)).intersection(row).intersection(zone).difference(clear)
 swale=car.buffer(1.9,join_style=1).difference(car.buffer(0.9,join_style=1)).intersection(row).intersection(zone).difference(clear)
